@@ -1,0 +1,14 @@
+# 本地 TensorFlow 学习示例与练习
+/tf_demo.py
+/examples/
+/exercises/
+/solutions/
+/saved_model/
+
+# 根目录下与项目数据副本重复的学习数据
+/archive/
+
+# Python 运行环境及缓存
+/.venv/
+__pycache__/
+*.py[cod]

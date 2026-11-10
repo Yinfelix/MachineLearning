@@ -1,0 +1,55 @@
+{
+  "paths": {
+    "data": "..\\archive\\data\\bakery_sales_dataset.csv",
+    "audit": "outputs\\metrics\\data_audit.json",
+    "figures": "outputs\\figures"
+  },
+  "target": "Quantity",
+  "formats": {
+    "date": "%Y-%m-%d",
+    "time": "%H:%M"
+  },
+  "features": {
+    "numeric": [
+      "Customer_Age", "Temperature", "Unit_Price", "Discount_Percentage",
+      "Shelf_Life_Days", "Year", "Month", "Hour"
+    ],
+    "categorical": [
+      "Product", "Category", "Customer_Gender", "Customer_Segment",
+      "Day_of_Week", "Weather", "Season", "Storage_Type", "Perishability", "Store_ID"
+    ],
+    "binary": ["Loyalty_Member", "Weekend", "Promotion_Applied"],
+    "special_categorical": ["Festival", "Promotion_Type"]
+  },
+  "binary_values": ["No", "Yes"],
+  "missing_values": {
+    "unspecified": "Not Specified",
+    "no_promotion": "No Promotion"
+  },
+  "audit": {
+    "equality_tolerance": 1e-8
+  },
+  "excluded_fields": {
+    "Order_ID": "订单标识符",
+    "Customer_ID": "客户标识符",
+    "Date": "用于时间划分，基础输入使用日期派生字段",
+    "Time": "基础输入使用 Hour",
+    "Day": "基础候选字段未包含当月日期",
+    "Cost_Price": "基础候选字段未包含成本价格",
+    "Selling_Price": "可由单价与折扣推导",
+    "Total_Bill": "由售价和 Quantity 计算",
+    "Profit": "由售价、成本和 Quantity 计算",
+    "Units_Sold": "销售结果字段",
+    "Units_Produced": "生产结果字段",
+    "Unsold_Units": "事后库存结果",
+    "Stock_Available": "时间点和定义待确认",
+    "Waste_Pct": "事后结果指标",
+    "Payment_Method": "购买数量确定后的交易信息",
+    "Customer_Rating": "交易后的评价"
+  },
+  "split_periods": {
+    "train": ["2023-01-01", "2024-06-30"],
+    "validation": ["2024-07-01", "2024-09-30"],
+    "test": ["2024-10-01", "2024-12-31"]
+  }
+}

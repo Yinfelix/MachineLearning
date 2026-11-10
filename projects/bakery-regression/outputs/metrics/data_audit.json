@@ -1,0 +1,84 @@
+{
+  "cleaning": {
+    "input_rows": 19321,
+    "kept_rows": 19321,
+    "skipped_rows": 0,
+    "skipped_by_reason": {
+      "invalid_date": 0,
+      "invalid_quantity": 0,
+      "outside_periods": 0,
+      "cross_split_order": 0
+    }
+  },
+  "rows": 19321,
+  "columns": 40,
+  "date_range": {
+    "start": "2023-01-01",
+    "end": "2024-12-31",
+    "days_with_orders": 731
+  },
+  "unique_counts": {
+    "orders": 6576,
+    "customers": 500,
+    "products": 35,
+    "stores": 3
+  },
+  "duplicate_rows": 0,
+  "missing_values": {
+    "Festival": {
+      "count": 16006,
+      "percentage": 82.84
+    },
+    "Promotion_Type": {
+      "count": 13826,
+      "percentage": 71.56
+    }
+  },
+  "calendar_feature_mismatches": {
+    "Year": 0,
+    "Month": 0,
+    "Day": 0,
+    "Day_of_Week": 0,
+    "Weekend": 0,
+    "Hour": 0
+  },
+  "splits": {
+    "train": {
+      "rows": 14340,
+      "start": "2023-01-01",
+      "end": "2024-06-30"
+    },
+    "validation": {
+      "rows": 2533,
+      "start": "2024-07-01",
+      "end": "2024-09-30"
+    },
+    "test": {
+      "rows": 2448,
+      "start": "2024-10-01",
+      "end": "2024-12-31"
+    }
+  },
+  "training_quantity": {
+    "mean": 2.2204,
+    "median": 2.0,
+    "std": 1.7777,
+    "min": 1.0,
+    "q75": 3.0,
+    "max": 20.0,
+    "skew": 2.6053
+  },
+  "training_quantity_vs_units_sold": {
+    "sold_greater": 3779,
+    "equal": 10561,
+    "sold_less": 0
+  },
+  "training_leakage_relationship_mismatches": {
+    "total_bill": 0,
+    "profit": 0
+  },
+  "promotion_type_missing": {
+    "without_promotion": 13826,
+    "with_promotion": 0
+  }
+}
