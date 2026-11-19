@@ -41,6 +41,8 @@ python -m unittest discover -s tests -v
 
 审计结果写入 `outputs/metrics/data_audit.json`。26 项测试覆盖日期划分、订单分组、缺失填补、编码、特征生成、模型序列化和特征选择。
 
+已有实验结果时，在本项目目录执行 `python -m src.plots`，即可从逐条预测记录重新生成实际值与预测值对比图。主图使用全部测试明细的真实坐标，左上角小图展示低值区域，虚线表示理想预测。
+
 ### 数据探索 Notebook
 
 在本项目目录中，用运行实验的 Python 环境安装 Notebook 依赖并注册内核。执行命令中的内核名称与注册名称一致。

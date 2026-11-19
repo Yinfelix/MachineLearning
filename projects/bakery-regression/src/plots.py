@@ -1,12 +1,21 @@
-"""从实验输出绘制分布、误差比较与实际值对预测值图。"""
+"""从实验输出绘图。python -m src.plots 单独更新实际值与预测值图。"""
+
+import json
 
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+from matplotlib.lines import Line2D
+from matplotlib.patches import Rectangle
 
 from .config import AUDIT_OUTPUT_PATH, FIGURE_DIRECTORY
+from .models import metrics
+
+
+FONTS = ["Microsoft YaHei", "PingFang SC", "Noto Sans CJK SC",
+         "WenQuanYi Micro Hei", "DejaVu Sans"]
 
 
 def save(fig, name):
@@ -15,11 +24,69 @@ def save(fig, name):
     plt.close(fig)
 
 
+def draw_predictions(pred, winners):
+    """按每条明细的原始坐标绘图，并放大低值密集区。"""
+    style = {
+        "font.sans-serif": FONTS, "font.size": 12, "axes.unicode_minus": False,
+        "axes.spines.top": False, "axes.spines.right": False,
+    }
+    specs = [
+        ("Quantity", "（a）购买件数", "件", 21, [0, 5, 10, 15, 20], 8),
+        ("Total_Bill", "（b）明细金额", "数据集金额单位", 1750, [0, 500, 1000, 1500], 500),
+    ]
+    names = {"median": "总体中位数", "product_median": "商品中位数",
+             "ridge": "岭回归", "tree": "决策树", "forest": "随机森林",
+             "price_x_quantity": "折后单价 × 预测件数"}
+    blue, orange = "#226793", "#b95532"
+    with plt.rc_context(style):
+        fig, axes = plt.subplots(1, 2, figsize=(10.6, 6.4))
+        fig.subplots_adjust(left=0.08, right=0.98, bottom=0.27, top=0.81, wspace=0.28)
+        fig.suptitle(f"独立测试集实际值与预测值   n = {len(pred):,}", fontsize=16, y=0.98)
+        for ax, (target, title, unit, limit, ticks, zoom) in zip(axes, specs):
+            actual = pred[target]
+            fitted = pred[f"{target}_{winners[target]}"]
+            limit = max(limit, 1.05 * actual.max(), 1.05 * fitted.max())
+            ax.scatter(actual, fitted, s=16, alpha=0.28, color=blue, edgecolors="none", zorder=3)
+            ax.plot([0, limit], [0, limit], "--", color=orange, lw=1.3, zorder=2)
+            ax.set(xlim=(0, limit), ylim=(0, limit), xticks=ticks, yticks=ticks,
+                   xlabel=f"实际值（{unit}）", ylabel=f"预测值（{unit}）", aspect="equal")
+            ax.set_title(f"{title}\n{names[winners[target]]}", fontsize=13, pad=12)
+            ax.grid(color="#dfe4e8", linewidth=0.6, zorder=0)
+
+            inset = ax.inset_axes([0.12, 0.54, 0.40, 0.40])
+            inset.set_facecolor("#f7f9fb")
+            inset.scatter(actual, fitted, s=10, alpha=0.28, color=blue, edgecolors="none", zorder=3)
+            inset.plot([0, zoom], [0, zoom], "--", color=orange, lw=1, zorder=2)
+            inset.set(xlim=(0, zoom), ylim=(0, zoom), xticks=[0, zoom / 2, zoom],
+                      yticks=[0, zoom / 2, zoom], aspect="equal")
+            inset.set_title("局部放大", fontsize=10, pad=4)
+            inset.tick_params(labelsize=9, length=3, pad=2)
+            inset.grid(color="#e3e8ec", linewidth=0.5, zorder=0)
+            for spine in inset.spines.values():
+                spine.set_visible(True)
+                spine.set_color("#9aa5ae")
+            ax.add_patch(Rectangle((0, 0), zoom, zoom, fill=False, edgecolor="#9aa5ae", lw=0.8))
+
+            score = metrics(actual, fitted)
+            digits = 4 if target == "Quantity" else 2
+            ax.text(0.5, -0.23, f"MAE = {score['MAE']:.{digits}f}    RMSE = {score['RMSE']:.{digits}f}\n"
+                    f"R² = {score['R2']:.4f}", transform=ax.transAxes, ha="center", va="top",
+                    fontsize=11, linespacing=1.5)
+
+        legend = [
+            Line2D([], [], marker="o", linestyle="none", color=blue, markersize=5, label="测试明细"),
+            Line2D([], [], linestyle="--", color=orange, lw=1.3, label="理想预测  y = x"),
+        ]
+        fig.legend(handles=legend, loc="lower center", ncol=2, frameon=False, bbox_to_anchor=(0.5, 0.01))
+        FIGURE_DIRECTORY.mkdir(parents=True, exist_ok=True)
+        fig.savefig(FIGURE_DIRECTORY / "05_actual_predicted.png", dpi=300, bbox_inches="tight")
+        plt.close(fig)
+
+
 def draw_figures(train, results, pred, winners):
     FIGURE_DIRECTORY.mkdir(parents=True, exist_ok=True)
     plt.rcParams.update({
-        "font.size": 10, "font.sans-serif": ["Microsoft YaHei", "PingFang SC", "Noto Sans CJK SC",
-                                             "WenQuanYi Micro Hei", "DejaVu Sans"],
+        "font.size": 10, "font.sans-serif": FONTS,
         "axes.unicode_minus": False, "axes.spines.top": False, "axes.spines.right": False,
     })
     qty, bill = "Quantity", "Total_Bill"
@@ -51,16 +118,7 @@ def draw_figures(train, results, pred, winners):
             ax.text(value, i, label, va="center", fontsize=9)
     save(fig, "04_test_mae.png")
 
-    fig, axes = plt.subplots(1, 2, figsize=(8.4, 3.4))
-    for ax, target, title in zip(axes, [qty, bill], ["（a）购买件数", "（b）明细金额"]):
-        actual, fitted = pred[target], pred[f"{target}_{winners[target]}"]
-        high = max(actual.max(), fitted.max()) * 1.03
-        cells = ax.hexbin(actual, fitted, gridsize=30, mincnt=1, bins="log", cmap="viridis",
-                          extent=(0, high, 0, high))
-        ax.plot([0, high], [0, high], "--", color="#a34d30", lw=1.2)
-        ax.set(xlabel="实际值", ylabel="预测值", title=title, xlim=(0, high), ylim=(0, high), aspect="equal")
-        fig.colorbar(cells, ax=ax, shrink=0.75, label="明细数")
-    save(fig, "05_actual_predicted.png")
+    draw_predictions(pred, winners)
 
     fig, axes = plt.subplots(1, 2, figsize=(8.4, 2.9))
     for ax, target, title in zip(axes, [qty, bill], ["（a）购买件数", "（b）明细金额"]):
@@ -81,3 +139,10 @@ def draw_figures(train, results, pred, winners):
     ax.set(yticks=pos, yticklabels=groups.group.map(labels), xlabel="验证集 MAE 变化（件）")
     ax.legend(frameon=False, loc="lower right")
     save(fig, "07_feature_groups.png")
+
+
+if __name__ == "__main__":
+    directory = AUDIT_OUTPUT_PATH.parent
+    predictions = pd.read_csv(directory / "predictions.csv")
+    selected = json.loads((directory / "selection.json").read_text(encoding="utf-8"))
+    draw_predictions(predictions, selected)
