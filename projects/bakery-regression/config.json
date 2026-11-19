@@ -1,8 +1,8 @@
 {
   "paths": {
-    "data": "..\\archive\\data\\bakery_sales_dataset.csv",
-    "audit": "outputs\\metrics\\data_audit.json",
-    "figures": "outputs\\figures"
+    "data": "../archive/data/bakery_sales_dataset.csv",
+    "audit": "outputs/metrics/data_audit.json",
+    "figures": "outputs/figures"
   },
   "target": "Quantity",
   "formats": {

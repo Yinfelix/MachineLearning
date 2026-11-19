@@ -21,45 +21,21 @@ from src.preprocessing import PromotionTypeFiller, build_preprocessor
 
 
 def dense(matrix):
-    """
-    将稀疏或稠密矩阵转换为 NumPy 数组。
-
-    参数：
-        matrix: 预处理结果矩阵。
-
-    返回：
-        NumPy 数组。
-    """
+    """将稀疏或稠密矩阵转换为 NumPy 数组。"""
     return matrix.toarray() if hasattr(matrix, "toarray") else np.asarray(matrix)
 
 
 class PreprocessingTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        """
-        准备共享的真实数据和预处理器。
-
-        参数：
-            cls
-
-        返回：
-            None
-        """
+        """准备共享的真实数据和预处理器。"""
         cls.data, _ = load_dataset()
         cls.splits = split_by_date(cls.data)
         cls.preprocessor = build_preprocessor()
         cls.preprocessor.fit(cls.splits.train)
 
     def test_feature_roles_cover_original_schema_without_overlap(self):
-        """
-        验证配置覆盖原始字段且输入与目标、排除字段隔离。
-
-        参数：
-            self
-
-        返回：
-            None
-        """
+        """验证配置覆盖原始字段且输入与目标、排除字段隔离。"""
         self.assertEqual(len(FEATURE_COLUMNS), len(set(FEATURE_COLUMNS)))
         self.assertFalse(set(FEATURE_COLUMNS) & set(EXCLUDED_FIELDS))
         self.assertNotIn(TARGET_COLUMN, FEATURE_COLUMNS)
@@ -69,15 +45,7 @@ class PreprocessingTests(unittest.TestCase):
         )
 
     def test_target_and_excluded_fields_cannot_affect_transformation(self):
-        """
-        验证目标及排除字段的变化不会影响输入矩阵。
-
-        参数：
-            self
-
-        返回：
-            None
-        """
+        """验证目标及排除字段的变化不会影响输入矩阵。"""
         sample = self.splits.validation.iloc[:5].copy()
         changed = sample.copy()
         for column in EXCLUDED_FIELDS:
@@ -88,15 +56,7 @@ class PreprocessingTests(unittest.TestCase):
         np.testing.assert_allclose(actual, expected)
 
     def test_scaler_is_fitted_only_on_training_data(self):
-        """
-        验证标准化统计量只来自训练集。
-
-        参数：
-            self
-
-        返回：
-            None
-        """
+        """验证标准化统计量只来自训练集。"""
         scaler = self.preprocessor.named_transformers_["numeric"].named_steps["scaler"]
         expected = self.splits.train[NUMERIC_FEATURES].mean().to_numpy()
         np.testing.assert_allclose(scaler.mean_, expected)
@@ -106,15 +66,7 @@ class PreprocessingTests(unittest.TestCase):
         np.testing.assert_allclose(scaler.mean_, expected)
 
     def test_numeric_imputation_uses_training_median_without_scaling(self):
-        """
-        验证缺失数值使用训练集中位数填补。
-
-        参数：
-            self
-
-        返回：
-            None
-        """
+        """验证缺失数值使用训练集中位数填补。"""
         train = self.splits.train.iloc[:20].copy()
         train.loc[train.index[0], "Temperature"] = np.nan
         median = train["Temperature"].median()
@@ -132,15 +84,7 @@ class PreprocessingTests(unittest.TestCase):
         self.assertEqual(transformed[0, index], median)
 
     def test_unknown_category_is_ignored_without_refitting(self):
-        """
-        验证新商品类别可以转换且不会更新训练类别表。
-
-        参数：
-            self
-
-        返回：
-            None
-        """
+        """验证新商品类别可以转换且不会更新训练类别表。"""
         validation = self.splits.validation.iloc[:1].copy()
         validation["Product"] = "New Product"
         transformed = dense(self.preprocessor.transform(validation))
@@ -153,15 +97,7 @@ class PreprocessingTests(unittest.TestCase):
         self.assertNotIn("categorical__Product_New Product", names)
 
     def test_binary_encoding_and_missing_category_labels(self):
-        """
-        验证二元编码及节日、促销缺失标签。
-
-        参数：
-            self
-
-        返回：
-            None
-        """
+        """验证二元编码及节日、促销缺失标签。"""
         sample = pd.concat([self.splits.train.iloc[:1]] * 2, ignore_index=True)
         for column in BINARY_FEATURES:
             sample[column] = ["No", "Yes"]
@@ -177,15 +113,7 @@ class PreprocessingTests(unittest.TestCase):
         self.assertIn("promotion_type__Promotion_Type_No Promotion", names)
 
     def test_invalid_binary_value_is_rejected(self):
-        """
-        验证非法二元类别由编码器原生错误提示。
-
-        参数：
-            self
-
-        返回：
-            None
-        """
+        """验证非法二元类别由编码器原生错误提示。"""
         sample = self.splits.validation.iloc[:1].copy()
         sample["Promotion_Applied"] = "Maybe"
         sample["Promotion_Type"] = "Festival"
@@ -193,15 +121,7 @@ class PreprocessingTests(unittest.TestCase):
             self.preprocessor.transform(sample)
 
     def test_promotion_type_is_filled_for_each_status(self):
-        """
-        验证所有促销状态的空类型都按语义填补。
-
-        参数：
-            self
-
-        返回：
-            None
-        """
+        """验证所有促销状态的空类型都按语义填补。"""
         filler = PromotionTypeFiller()
         valid = pd.DataFrame(
             {
@@ -217,15 +137,7 @@ class PreprocessingTests(unittest.TestCase):
         )
 
     def test_blank_features_are_imputed(self):
-        """
-        验证空白类别、二元和数值字段均可完成填补。
-
-        参数：
-            self
-
-        返回：
-            None
-        """
+        """验证空白类别、二元和数值字段均可完成填补。"""
         sample = self.splits.validation.iloc[:1].copy()
         sample["Product"] = " "
         sample["Temperature"] = ""
@@ -241,15 +153,7 @@ class PreprocessingTests(unittest.TestCase):
         self.assertTrue(np.isfinite(transformed).all())
 
     def test_model_pipeline_can_be_cloned_and_serialized(self):
-        """
-        验证预处理器能与回归模型组合、克隆并序列化。
-
-        参数：
-            self
-
-        返回：
-            None
-        """
+        """验证预处理器能与回归模型组合、克隆并序列化。"""
         pipeline = Pipeline([("preprocessor", build_preprocessor()), ("model", Ridge())])
         train = self.splits.train.iloc[:300]
         validation = self.splits.validation.iloc[:5]

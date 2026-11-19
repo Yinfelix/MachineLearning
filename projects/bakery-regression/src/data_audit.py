@@ -12,28 +12,12 @@ from .dataset import DatasetSplits, load_dataset, split_by_date
 
 
 def _date_text(value: pd.Timestamp) -> str | None:
-    """
-    将日期统计量转换为可保存的文本。
-
-    参数：
-        value: 日期最小值或最大值，可以为 NaT。
-
-    返回：
-        配置格式的日期字符串，NaT 对应 None。
-    """
+    """将日期统计量转换为可保存的文本。"""
     return value.strftime(config.DATE_FORMAT) if pd.notna(value) else None
 
 
 def _split_summary(splits: DatasetSplits) -> dict:
-    """
-    汇总三个数据集的记录数和时间范围。
-
-    参数：
-        splits: 清理后按时间划分的数据集容器。
-
-    返回：
-        以数据集名称为键的摘要，空集合的日期范围为 None。
-    """
+    """汇总三个数据集的记录数和时间范围。"""
     result = {}
     for name in config.SPLIT_PERIODS:
         part = getattr(splits, name)
@@ -46,15 +30,7 @@ def _split_summary(splits: DatasetSplits) -> dict:
 
 
 def _quantity_summary(quantity: pd.Series) -> dict:
-    """
-    计算训练集购买数量的描述性统计。
-
-    参数：
-        quantity: 清理后的训练集购买数量列。
-
-    返回：
-        包含均值、中位数、标准差、极值、上四分位数和偏度的字典，未定义的值为 None。
-    """
+    """计算训练集购买数量的描述性统计。"""
     values = {
         "mean": quantity.mean(),
         "median": quantity.median(),
@@ -71,16 +47,7 @@ def _quantity_summary(quantity: pd.Series) -> dict:
 
 
 def audit_dataset(data: pd.DataFrame, cleaning_report: dict) -> dict:
-    """
-    汇总清理结果、全量数据质量及训练集目标关系。
-
-    参数：
-        data: load_dataset 或 clean_dataset 返回的清理后订单明细。
-        cleaning_report: 同次清理返回的输入、保留、跳过数量及原因统计。
-
-    返回：
-        JSON 可序列化的审计字典。
-    """
+    """汇总清理结果、全量数据质量及训练集目标关系。"""
     splits = split_by_date(data)
     train = splits.train
     quantity = train[config.TARGET_COLUMN]
@@ -164,16 +131,7 @@ def audit_dataset(data: pd.DataFrame, cleaning_report: dict) -> dict:
 def write_audit_report(
     report: dict, output: str | Path = config.AUDIT_OUTPUT_PATH
 ) -> Path:
-    """
-    创建父目录并将审计结果写入 UTF-8 JSON 文件。
-
-    参数：
-        report: audit_dataset 返回的审计字典。
-        output: 输出文件路径，默认使用配置中的审计路径。
-
-    返回：
-        已写入的文件路径。
-    """
+    """创建父目录并将审计结果写入 UTF-8 JSON 文件。"""
     path = Path(output)
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(
@@ -184,15 +142,7 @@ def write_audit_report(
 
 
 def main() -> None:
-    """
-    解析 --data 和 --output 参数并写入审计报告。
-
-    参数：
-        无
-
-    返回：
-        None
-    """
+    """解析 --data 和 --output 参数并写入审计报告。"""
     parser = argparse.ArgumentParser(description="审计烘焙订单数据并生成 JSON 报告")
     parser.add_argument("--data", type=Path, default=config.DEFAULT_DATA_PATH, help="原始 CSV 路径")
     parser.add_argument("--output", type=Path, default=config.AUDIT_OUTPUT_PATH, help="审计 JSON 路径")

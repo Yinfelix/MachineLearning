@@ -1,122 +1,144 @@
-# 烘焙订单购买数量预测
+# 烘焙订单明细的购买件数与金额预测
 
-以订单明细为单位，使用下单时可获得的信息预测 `Quantity`，比较经典回归模型，
-并研究特征工程与特征选择。完整研究需求见 [requirements.md](../requirements.md)。
+一条样本对应订单中的一种商品。实验预测购买件数（`Quantity`）和该行商品的结账金额（`Total_Bill`），比较直接回归金额与“折后单价 × 预测件数”的效果。原始数据、代码、图表与报告共同组成实验一的提交内容。[实验报告](实验1报告_烘焙订单回归.docx)
 
-## 阶段计划
+## 环境与运行
 
-| 阶段 | 任务 | 交付与验收 |
-| --- | --- | --- |
-| 1. 数据探索与预处理 | 审计数据与泄漏字段，按时间划分数据，建立预处理 Pipeline | 已完成：数据审计结果、探索 Notebook、可复用预处理代码和测试 |
-| 2. 基础模型实验 | 建立 Dummy、Ridge、决策树和随机森林，统一 MAE、RMSE、R²；以训练集和验证集比较模型并优化参数 | 模型比较结果、参数记录、性能对比图 |
-| 3. 特征工程与消融 | 对比 FE-0 至 FE-3，研究时间周期、商品交互、特征选择及客户、时间、价格、天气、商品特征消融 | 特征工程实验矩阵、重要性与消融分析图表 |
-| 4. 最终评估与报告 | 固定实验方案，合并训练集与验证集重新训练，在测试集评估并分析残差 | 最终指标、预测与残差图、实验报告 |
+使用 Python 3.11（64 位）。NumPy、pandas、SciPy、scikit-learn、Matplotlib 和 Joblib 的复现版本记录在仓库根目录的 `requirements.txt`。
 
-后续实验按以下顺序开展：
+从仓库根目录开始运行。
 
-1. **阶段 2（EXP1–EXP2）**：以训练集中位数建立 Dummy 基准，比较三种回归模型；
-   在训练集内按日期开展时序调参，用验证集选择模型和参数。
-2. **阶段 3（EXP3–EXP6）**：FE-0 使用基础特征；FE-1 加入时间周期与趋势；
-   FE-2 加入商品交互；FE-3 比较互信息、排列重要性和 Top-K 特征选择，并完成特征消融。
-3. **阶段 4（EXP7）**：固定方案后合并训练集与验证集重新训练，在测试集计算
-   MAE、RMSE、R²，整理预测图、残差图和实验报告。
-
-阶段 1 的数据质量概览统计全量记录的字段、缺失、时间范围及重复情况；目标分布、
-相关性和数量关系分析使用训练集。各阶段的模型、参数与特征选择使用训练集和验证集；
-测试集用于最终评估。
-
-## 数据与字段
-
-项目直接读取 [bakery_sales_dataset.csv](../archive/data/bakery_sales_dataset.csv)，
-一条记录表示一次订单中的一种商品。原始数据包含 19,321 条记录、40 个字段，目标
-`Quantity` 表示购买数量。
-
-| 数据集 | 日期范围 | 记录数 |
-| --- | --- | ---: |
-| 训练集 | 2023-01-01 至 2024-06-30 | 14,340 |
-| 验证集 | 2024-07-01 至 2024-09-30 | 2,533 |
-| 测试集 | 2024-10-01 至 2024-12-31 | 2,448 |
-
-输入字段采用白名单，包括商品、客户、价格、促销、时间、环境、商品属性与门店信息。
-实际客户字段名为 `Customer_Gender` 和 `Customer_Segment`。`Date` 用于划分，
-`Year`、`Month`、`Day_of_Week`、`Weekend` 和 `Hour` 用作基础时间特征。
-
-`Total_Bill`、`Profit`、`Units_Sold` 等结果字段、交易后字段和标识符均排除在输入之外。
-`Selling_Price` 可由单价与折扣推导，基础实验使用 `Unit_Price` 和
-`Discount_Percentage`；`Cost_Price` 和 `Day` 不在基础候选字段中。
-完整字段清单及排除原因见探索 Notebook。
-
-数据核验发现，`Units_Sold` 有 5,161 条记录大于 `Quantity`，其余 14,160 条相等。
-账单与利润使用 `Quantity` 计算，因此两种数量的业务含义需要分别表述。
-
-## 预处理
-
-- 数值列使用训练集的中位数填补缺失，并可按模型需要使用 `StandardScaler`。
-- 类别列使用 One-Hot 编码，验证集和测试集的新类别可正常转换。
-- `Loyalty_Member`、`Weekend`、`Promotion_Applied` 使用 `No=0`、`Yes=1` 编码。
-- 空字符串和纯空白统一作为缺失处理；普通类别及二元字段使用训练集众数填补。
-- `Festival` 缺失值填为 `Not Specified`；未促销且类型缺失时填为 `No Promotion`，
-  已促销或状态缺失时的空类型填为 `Not Specified`。
-- 时间周期编码、特征交互和特征选择安排在阶段 3。
-
-`build_preprocessor()` 返回尚未拟合的 `ColumnTransformer`。训练时将它放入模型的
-`Pipeline`，只对训练集调用 `fit`；可通过 `scale_numeric=False` 为树模型关闭标准化。
-审计会核验日期、星期和小时字段的一致性。
-
-数据读取、清理和审计命令正常运行时保持静默。日期缺失或无效、目标值缺失或非正整数、
-日期超出配置范围以及订单跨数据集的记录会被跳过，原因和数量写入审计 JSON 的
-`cleaning` 字段。同一记录按上述顺序归入首个原因，确保原因计数之和等于跳过记录数。
-空时间区间保留为空表，未定义的统计量保存为 `null`。
-
-## 代码与配置
-
-| 文件 | 职责 |
-| --- | --- |
-| [config.json](config.json) | 数据和输出路径、字段白名单、排除原因、时间区间、填补标签、审计容差 |
-| [src/config.py](src/config.py) | 读取 JSON 并统一解析项目相对路径 |
-| [src/dataset.py](src/dataset.py) | 读取 CSV、清理异常记录、统计跳过原因、划分数据集 |
-| [src/preprocessing.py](src/preprocessing.py) | 缺失填补、类别编码、数值标准化 |
-| [src/data_audit.py](src/data_audit.py) | 数据质量与训练集分析、静默生成 JSON 报告 |
-
-`load_dataset()` 返回 `(data, cleaning_report)`，分别是清理后的数据表和清理统计。
-将二者传给 `audit_dataset(data, cleaning_report)`，再由 `write_audit_report()` 保存报告。
-修改配置后重新运行程序或重启 Notebook 内核即可生效。
-
-依赖按实际用途保留：NumPy、Pandas 和 Scikit-learn 用于数据处理；Matplotlib 用于
-Notebook 绘图；Joblib 用于 Pipeline 持久化测试；IPykernel 和 NBConvert 用于
-Notebook 运行与执行验证。配置使用 Python 标准库 JSON。
-
-## 运行
-
-从工作区根目录安装共用依赖，再进入项目目录：
-
-```powershell
-.\.venv\Scripts\python.exe -m pip install -r .\requirements.txt
-Set-Location .\projects\bakery-regression
+```text
+python -m pip install -r requirements.txt
+cd projects/bakery-regression
+python -m src.train
 ```
 
-生成数据审计结果：
+该命令依次执行数据审计、基础模型比较、时序调参、特征实验、独立测试和绘图。终端显示最终指标，结果写入当前项目的 `outputs/`。再次运行会重新生成结果表和图表。
+
+### Windows 虚拟环境
+
+在仓库根目录打开 PowerShell，执行以下命令。
 
 ```powershell
-..\..\.venv\Scripts\python.exe -m src.data_audit
-```
-
-使用 VS Code 打开 [01_data_exploration.ipynb](notebooks/01_data_exploration.ipynb)，
-选择工作区 `.venv` 内核并运行全部单元格。Notebook 展示数据审计、字段筛选、训练集
-分布与相关性，并验证训练集拟合及验证集转换。运行后生成：
-
-- `outputs\metrics\data_audit.json`
-- `outputs\figures\01_quantity_distribution.png`
-- `outputs\figures\02_training_correlations.png`
-
-也可以在项目目录中通过命令执行 Notebook：
-
-```powershell
-..\..\.venv\Scripts\python.exe -m nbconvert --to notebook --execute --inplace .\notebooks\01_data_exploration.ipynb
-```
-
-运行阶段 1 测试：
-
-```powershell
+py -3.11 -m venv .venv
+.\.venv\Scripts\python.exe -m pip install -r requirements.txt
+cd projects/bakery-regression
+..\..\.venv\Scripts\python.exe -m src.train
 ..\..\.venv\Scripts\python.exe -m unittest discover -s tests -v
 ```
+
+中文图表使用系统中的微软雅黑、苹方、思源黑体或文泉驿微米黑。运行时使用 `src/models.py` 中的随机种子 42，随机森林固定 64 棵树并使用 4 个并行任务。
+
+### 单独审计与测试
+
+在本项目目录、使用同一 Python 环境运行。
+
+```text
+python -m src.data_audit
+python -m unittest discover -s tests -v
+```
+
+审计结果写入 `outputs/metrics/data_audit.json`。26 项测试覆盖日期划分、订单分组、缺失填补、编码、特征生成、模型序列化和特征选择。
+
+### 数据探索 Notebook
+
+在本项目目录中，用运行实验的 Python 环境安装 Notebook 依赖并注册内核。执行命令中的内核名称与注册名称一致。
+
+```text
+python -m pip install ipykernel nbconvert
+python -m ipykernel install --user --name bakery-regression --display-name "Python (bakery-regression)"
+python -m nbconvert --to notebook --execute --inplace --ExecutePreprocessor.kernel_name=bakery-regression notebooks/01_data_exploration.ipynb
+```
+
+使用 VS Code 时，也可打开笔记并选择 `Python (bakery-regression)` 内核运行全部单元格。笔记生成 01、02 两张数据探索图。[数据探索笔记](notebooks/01_data_exploration.ipynb)
+
+## 数据与预处理
+
+随仓库提供的 CSV 含 19,321 条合成交易明细、40 个字段，涵盖 2023—2024 年的 35 种商品、500 位顾客和三家门店。数据由 sdcloud 发布，许可为 CC0。[原始 CSV](../archive/data/bakery_sales_dataset.csv) · [数据集发布页](https://www.kaggle.com/datasets/sdcloud/historical-bakery-sales-dataset)
+
+基础输入包括商品、顾客、门店、标价、折扣、促销、日历和天气等 23 个字段，具体列名记录在 `config.json`。件数和金额分别作为预测目标，金额沿用数据集的计价单位。
+
+- 数值列按训练中位数填补，岭回归使用标准化。
+- 普通类别按训练众数填补并做独热编码。
+- 会员、周末和促销状态编码为 0 或 1。
+- 节日空值编码为 `Not Specified`，未促销记录的空促销类型编码为 `No Promotion`。
+- 时间特征与商品交互由原始输入构造，预处理和互信息筛选在相应训练数据上拟合。
+
+| 数据 | 日期范围 | 明细数 | 用途 |
+| --- | --- | ---: | --- |
+| 训练 | 2023-01-01 至 2024-06-30 | 14,340 | 按日期做三折扩展窗口验证，确定模型参数 |
+| 验证 | 2024-07-01 至 2024-09-30 | 2,533 | 比较特征和模型，以 MAE 确定最终方案 |
+| 测试 | 2024-10-01 至 2024-12-31 | 2,448 | 合并训练与验证数据重训后评估 |
+
+同一天的订单进入同一交叉验证折，每折使用较早日期预测较晚日期。三个验证窗口分别始于 2023-05-20、2023-10-03 和 2024-02-16。
+
+## 模型与参数选择
+
+| 方法 | 实现 | 参数搜索 |
+| --- | --- | --- |
+| 总体中位数 | `DummyRegressor` | 训练目标的中位数 |
+| 岭回归 | `Ridge` | `alpha = [0.1, 1, 10, 100]` |
+| 决策树 | `DecisionTreeRegressor` | `max_depth = [4, 8, 12]`，`min_samples_leaf = [5, 30]` |
+| 随机森林 | `RandomForestRegressor` | `max_depth = [5, 12]`，`min_samples_leaf = [2, 20]` |
+| 商品中位数 | `ProductMedian` | 按商品计算训练集件数中位数 |
+
+经典回归模型分别拟合件数和金额。按商品估计金额时，程序由标价和折扣计算折后单价并保留两位小数，再乘以预测件数。
+
+每种回归模型按三折平均 MAE 选择参数。两项目标选出的岭回归 `alpha` 均为 10，决策树最大深度为 8、叶节点最少 30 条，随机森林最大深度为 12、叶节点最少 20 条。模型及特征方案随后在第三季度验证集比较，最终选择记录在 `selection.json`。
+
+## 特征工程与分析
+
+| 方案 | 特征构造 | 训练集编码列数 |
+| --- | --- | ---: |
+| 基础特征 | 23 个基础字段的填补和编码 | 103 |
+| 日历特征 | 加入月、星期、小时的正余弦及日期趋势 | 110 |
+| 商品交互 | 商品分别与季节、促销类型、周末和顾客分群组合 | 670 |
+| 互信息筛选 | 在商品交互特征中按训练集互信息选列 | 10、20、40 |
+
+件数实验在岭回归和随机森林上比较这些方案。另对顾客、日历、价格与促销、天气、商品五组字段做移除重训和验证集内的整组置换，观察 MAE 的变化。
+
+金额分析以训练集金额第 90 百分位为分界，比较两组测试明细上的金额换算与随机森林误差。完整记录保存在 `groups.csv` 和 `amount_bands.csv`。
+
+## 测试结果
+
+MAE 为平均绝对误差，RMSE 为均方根误差，两者越低越好。R² 为决定系数，越接近 1 表示拟合越好。表中结果来自 2024 年第四季度的 2,448 条独立测试明细。
+
+| 目标 | 方法 | MAE | RMSE | R² |
+| --- | --- | ---: | ---: | ---: |
+| 件数 | 总体中位数 | 1.1560 | 1.9289 | -0.0187 |
+| 件数 | 岭回归 | 0.8084 | **1.2378** | **0.5805** |
+| 件数 | 决策树 | 0.8171 | 1.2676 | 0.5601 |
+| 件数 | 随机森林 | 0.8083 | 1.2472 | 0.5741 |
+| 件数 | 商品中位数 | **0.7569** | 1.3396 | 0.5087 |
+| 金额 | 总体中位数 | 96.59 | 188.72 | -0.1440 |
+| 金额 | 岭回归 | 50.74 | 101.59 | 0.6685 |
+| 金额 | 决策树 | 51.31 | 104.64 | 0.6483 |
+| 金额 | 随机森林 | 50.00 | **101.01** | **0.6723** |
+| 金额 | 折后单价 × 预测件数 | **43.13** | 111.29 | 0.6021 |
+
+按验证集 MAE 选出的方案为商品中位数预测件数、再乘以折后单价估算金额。两项测试 MAE 相对总体中位数分别降低 34.5% 和 55.4%。[测试指标](outputs/metrics/test.csv) · [逐条预测](outputs/metrics/predictions.csv)
+
+![实际值与预测值](outputs/figures/05_actual_predicted.png)
+
+## 代码与输出
+
+| 路径 | 内容 |
+| --- | --- |
+| `config.json`、`src/config.py` | 数据位置、输入字段、时间划分与缺失标签 |
+| `src/dataset.py`、`src/data_audit.py` | 数据读取、清洗、时间划分和审计 |
+| `src/preprocessing.py`、`src/features.py` | 填补、编码、周期、交互及互信息 |
+| `src/models.py` | 模型、候选参数和评价指标 |
+| `src/train.py` | 调参、选模、特征分析和独立测试 |
+| `src/plots.py` | 根据实验结果绘图 |
+| `outputs/metrics/data_audit.json` | 数据质量和时间划分统计 |
+| `outputs/metrics/cv.csv` | 各组参数的三折 MAE 与选择结果 |
+| `outputs/metrics/validation.csv`、`selection.json` | 各方案的验证指标与最终选择 |
+| `outputs/metrics/test.csv`、`predictions.csv` | 测试指标与逐条真实值、预测值 |
+| `outputs/metrics/feature_scores.csv`、`groups.csv` | 互信息排名与特征组实验 |
+| `outputs/metrics/amount_bands.csv` | 按金额分组后的测试误差 |
+| `outputs/figures/` | 01–02 为探索笔记图，03–07 为训练分布、测试 MAE、预测、残差和特征组对照图 |
+
+结果表中，`median` 表示总体中位数，`product_median` 表示商品件数中位数，`price_x_quantity` 表示折后单价乘以预测件数。`ridge`、`tree`、`forest` 对应三种经典回归模型。`_initial` 为调参前，`_calendar` 和 `_cross` 为加入日历和商品交互，`_k` 后的数字为保留列数。
+
+修改数据路径、字段或时间划分可编辑 `config.json`，修改参数搜索范围可编辑 `src/models.py` 中的 `GRIDS`，随后重新执行训练命令。

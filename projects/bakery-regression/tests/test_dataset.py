@@ -13,27 +13,11 @@ from src.dataset import clean_dataset, load_dataset, split_by_date
 class DatasetTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        """
-        读取真实数据供时间划分测试使用。
-
-        参数：
-            cls
-
-        返回：
-            None
-        """
+        """读取真实数据供时间划分测试使用。"""
         cls.data, cls.cleaning = load_dataset()
 
     def test_real_split_counts_bounds_and_order(self):
-        """
-        验证真实数据的记录数、时间边界及订单隔离。
-
-        参数：
-            self
-
-        返回：
-            None
-        """
+        """验证真实数据的记录数、时间边界及订单隔离。"""
         splits = split_by_date(self.data)
         expected = {
             "train": (14340, "2023-01-01", "2024-06-30"),
@@ -56,15 +40,7 @@ class DatasetTests(unittest.TestCase):
         self.assertEqual(self.cleaning["skipped_rows"], 0)
 
     def test_invalid_dates_and_targets_are_counted_once(self):
-        """
-        验证日期、目标异常的静默跳过与原因计数互斥。
-
-        参数：
-            self
-
-        返回：
-            None
-        """
+        """验证日期、目标异常的静默跳过与原因计数互斥。"""
         invalid_targets = [None, "invalid", 0, -1, 1.5, np.inf]
         data = pd.DataFrame({
             "Date": ["2023-01-01"] * 7 + [None, "invalid", "2022-12-31", "2025-01-01"],
@@ -87,15 +63,7 @@ class DatasetTests(unittest.TestCase):
         pd.testing.assert_frame_equal(data, before)
 
     def test_cross_split_orders_are_recorded(self):
-        """
-        验证跨集合订单整体跳过并计入审计原因。
-
-        参数：
-            self
-
-        返回：
-            None
-        """
+        """验证跨集合订单整体跳过并计入审计原因。"""
         data = pd.DataFrame({
             "Date": ["2023-01-01", "2024-07-01", "2024-10-01"],
             "Quantity": [1, 2, 3],
@@ -106,15 +74,7 @@ class DatasetTests(unittest.TestCase):
         self.assertEqual(report["skipped_by_reason"]["cross_split_order"], 2)
 
     def test_empty_periods_are_preserved(self):
-        """
-        验证无记录的日期区间以空数据集返回。
-
-        参数：
-            self
-
-        返回：
-            None
-        """
+        """验证无记录的日期区间以空数据集返回。"""
         cleaned, _ = clean_dataset(pd.DataFrame({"Date": ["2023-01-01"], "Quantity": [1]}))
         splits = split_by_date(cleaned)
         self.assertEqual(len(splits.train), 1)
@@ -122,15 +82,7 @@ class DatasetTests(unittest.TestCase):
         self.assertTrue(splits.test.empty)
 
     def test_period_configuration_drives_cleaning_and_split(self):
-        """
-        验证清理与划分共用配置中的时间区间。
-
-        参数：
-            self
-
-        返回：
-            None
-        """
+        """验证清理与划分共用配置中的时间区间。"""
         periods = {
             "train": ["2023-01-01", "2024-03-31"],
             "validation": ["2024-04-01", "2024-09-30"],

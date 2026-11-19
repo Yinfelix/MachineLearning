@@ -18,28 +18,12 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 class DataAuditTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        """
-        准备真实数据及对应的审计结果。
-
-        参数：
-            cls
-
-        返回：
-            None
-        """
+        """准备真实数据及对应的审计结果。"""
         cls.data, cls.cleaning = load_dataset()
         cls.report = audit_dataset(cls.data, cls.cleaning)
 
     def test_real_dataset_overview_and_missing_values(self):
-        """
-        验证真实数据的概览、缺失数和时间字段一致性。
-
-        参数：
-            self
-
-        返回：
-            None
-        """
+        """验证真实数据的概览、缺失数和时间字段一致性。"""
         self.assertEqual((self.report["rows"], self.report["columns"]), (19321, 40))
         self.assertEqual(self.report["date_range"]["days_with_orders"], 731)
         self.assertEqual(
@@ -71,15 +55,7 @@ class DataAuditTests(unittest.TestCase):
         )
 
     def test_calendar_inconsistencies_are_reported(self):
-        """
-        验证时间字段不一致会写入审计结果。
-
-        参数：
-            self
-
-        返回：
-            None
-        """
+        """验证时间字段不一致会写入审计结果。"""
         changed = self.data.copy()
         first = changed.index[0]
         changed.loc[first, "Year"] = 2025
@@ -90,15 +66,7 @@ class DataAuditTests(unittest.TestCase):
         self.assertEqual(mismatches["Month"], 0)
 
     def test_training_quantity_relationships(self):
-        """
-        验证数量、账单与利润关系只基于训练集统计。
-
-        参数：
-            self
-
-        返回：
-            None
-        """
+        """验证数量、账单与利润关系只基于训练集统计。"""
         self.assertEqual(
             self.report["training_quantity_vs_units_sold"],
             {"sold_greater": 3779, "equal": 10561, "sold_less": 0},
@@ -109,15 +77,7 @@ class DataAuditTests(unittest.TestCase):
         )
 
     def test_training_statistics_do_not_use_test_targets(self):
-        """
-        验证测试目标值变化不会影响训练集分析。
-
-        参数：
-            self
-
-        返回：
-            None
-        """
+        """验证测试目标值变化不会影响训练集分析。"""
         changed = self.data.copy()
         test = changed["Date"] >= pd.Timestamp("2024-10-01")
         changed.loc[test, ["Quantity", "Units_Sold", "Total_Bill", "Profit"]] = 999
@@ -130,28 +90,12 @@ class DataAuditTests(unittest.TestCase):
             self.assertEqual(changed_report[key], self.report[key])
 
     def test_missing_audit_column_uses_native_error(self):
-        """
-        验证缺少必需审计列时保留 Pandas 原生错误。
-
-        参数：
-            self
-
-        返回：
-            None
-        """
+        """验证缺少必需审计列时保留 Pandas 原生错误。"""
         with self.assertRaisesRegex(KeyError, "Order_ID"):
             audit_dataset(self.data.drop(columns=["Order_ID"]), self.cleaning)
 
     def test_all_rows_skipped_produces_valid_json(self):
-        """
-        验证全部记录异常时仍可保存清理结果。
-
-        参数：
-            self
-
-        返回：
-            None
-        """
+        """验证全部记录异常时仍可保存清理结果。"""
         invalid = self.data.iloc[:3].copy()
         invalid["Date"] = None
         data, cleaning = clean_dataset(invalid)
@@ -163,15 +107,7 @@ class DataAuditTests(unittest.TestCase):
         json.dumps(report, allow_nan=False)
 
     def test_json_report_and_command_line(self):
-        """
-        验证报告保存和命令行静默执行。
-
-        参数：
-            self
-
-        返回：
-            None
-        """
+        """验证报告保存和命令行静默执行。"""
         with tempfile.TemporaryDirectory() as directory:
             destination = Path(directory) / "reports" / "audit.json"
             self.assertEqual(write_audit_report(self.report, destination), destination)
@@ -203,15 +139,7 @@ class DataAuditTests(unittest.TestCase):
             self.assertEqual(result.stderr, "")
 
     def test_skipped_rows_are_persisted_by_command_line(self):
-        """
-        验证命令行将异常记录原因保存到审计文件。
-
-        参数：
-            self
-
-        返回：
-            None
-        """
+        """验证命令行将异常记录原因保存到审计文件。"""
         with tempfile.TemporaryDirectory() as directory:
             source = Path(directory) / "dirty.csv"
             destination = Path(directory) / "audit.json"
