@@ -1,17 +1,16 @@
 """从实验输出绘图。python -m src.plots 单独更新实际值与预测值图。"""
 
-import json
-
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 from matplotlib.lines import Line2D
-from matplotlib.patches import Rectangle
+from matplotlib.ticker import MaxNLocator
 
-from .config import AUDIT_OUTPUT_PATH, FIGURE_DIRECTORY
-from .models import metrics
+from .config import AUDIT_OUTPUT_PATH, FEATURE_COLUMNS, FIGURE_DIRECTORY, NUMERIC_FEATURES
+from .dataset import load_dataset, split_by_date
+from .models import pipeline
 
 
 FONTS = ["Microsoft YaHei", "PingFang SC", "Noto Sans CJK SC",
@@ -24,60 +23,65 @@ def save(fig, name):
     plt.close(fig)
 
 
-def draw_predictions(pred, winners):
-    """按每条明细的原始坐标绘图，并放大低值密集区。"""
+def draw_predictions(pred):
+    """以面包的标价为横轴，对比实际值、商品中位数预测和岭回归直线。"""
+    pred = pred.reset_index(drop=True)
+    data, _ = load_dataset()
+    parts = split_by_date(data)
+    history = pd.concat([parts.train, parts.validation])
+    test = parts.test.reset_index(drop=True)
+    group = history[history.Product == "Bread"]
+    mask = test.Product == "Bread"
+    actual = pred.loc[mask]
+    price = test.loc[mask, "Unit_Price"]
+
+    # 固定其他输入，观察已选定的多变量岭回归模型随标价变化的预测。
+    reference = group[FEATURE_COLUMNS].mode(dropna=False).iloc[[0]].copy()
+    reference[NUMERIC_FEATURES] = group[NUMERIC_FEATURES].median().to_numpy()
+    grid = pd.concat([reference, reference], ignore_index=True)
+    grid["Unit_Price"] = [price.min(), price.max()]
+    cv = pd.read_csv(AUDIT_OUTPUT_PATH.parent / "cv.csv")
+
     style = {
-        "font.sans-serif": FONTS, "font.size": 12, "axes.unicode_minus": False,
+        "font.sans-serif": FONTS, "font.size": 13, "axes.unicode_minus": False,
         "axes.spines.top": False, "axes.spines.right": False,
     }
     specs = [
-        ("Quantity", "（a）购买件数", "件", 21, [0, 5, 10, 15, 20], 8),
-        ("Total_Bill", "（b）明细金额", "数据集金额单位", 1750, [0, 500, 1000, 1500], 500),
+        ("Quantity", "Quantity_product_median", "（a）购买件数", "件"),
+        ("Total_Bill", "Total_Bill_price_x_quantity", "（b）明细金额", "数据集金额单位"),
     ]
-    names = {"median": "总体中位数", "product_median": "商品中位数",
-             "ridge": "岭回归", "tree": "决策树", "forest": "随机森林",
-             "price_x_quantity": "折后单价 × 预测件数"}
-    blue, orange = "#226793", "#b95532"
+    gray, red, blue = "#92979d", "#ce3434", "#2463a6"
     with plt.rc_context(style):
-        fig, axes = plt.subplots(1, 2, figsize=(10.6, 6.4))
-        fig.subplots_adjust(left=0.08, right=0.98, bottom=0.27, top=0.81, wspace=0.28)
-        fig.suptitle(f"独立测试集实际值与预测值   n = {len(pred):,}", fontsize=16, y=0.98)
-        for ax, (target, title, unit, limit, ticks, zoom) in zip(axes, specs):
-            actual = pred[target]
-            fitted = pred[f"{target}_{winners[target]}"]
-            limit = max(limit, 1.05 * actual.max(), 1.05 * fitted.max())
-            ax.scatter(actual, fitted, s=16, alpha=0.28, color=blue, edgecolors="none", zorder=3)
-            ax.plot([0, limit], [0, limit], "--", color=orange, lw=1.3, zorder=2)
-            ax.set(xlim=(0, limit), ylim=(0, limit), xticks=ticks, yticks=ticks,
-                   xlabel=f"实际值（{unit}）", ylabel=f"预测值（{unit}）", aspect="equal")
-            ax.set_title(f"{title}\n{names[winners[target]]}", fontsize=13, pad=12)
-            ax.grid(color="#dfe4e8", linewidth=0.6, zorder=0)
+        fig, axes = plt.subplots(1, 2, figsize=(10, 5.4))
+        fig.subplots_adjust(left=0.075, right=0.98, bottom=0.32, top=0.80, wspace=0.33)
+        fig.suptitle(f"面包（Bread）的实际值与预测值   测试明细 n = {len(actual)}",
+                     fontsize=16, y=0.96)
+        for ax, (target, column, title, unit) in zip(axes, specs):
+            alpha = cv.loc[(cv.target == target) & (cv.model == "ridge") & cv.chosen, "alpha"].iloc[0]
+            ridge = pipeline("ridge").set_params(model__alpha=alpha)
+            ridge.fit(history[FEATURE_COLUMNS], history[target])
+            line = ridge.predict(grid)
 
-            inset = ax.inset_axes([0.12, 0.54, 0.40, 0.40])
-            inset.set_facecolor("#f7f9fb")
-            inset.scatter(actual, fitted, s=10, alpha=0.28, color=blue, edgecolors="none", zorder=3)
-            inset.plot([0, zoom], [0, zoom], "--", color=orange, lw=1, zorder=2)
-            inset.set(xlim=(0, zoom), ylim=(0, zoom), xticks=[0, zoom / 2, zoom],
-                      yticks=[0, zoom / 2, zoom], aspect="equal")
-            inset.set_title("局部放大", fontsize=10, pad=4)
-            inset.tick_params(labelsize=9, length=3, pad=2)
-            inset.grid(color="#e3e8ec", linewidth=0.5, zorder=0)
-            for spine in inset.spines.values():
-                spine.set_visible(True)
-                spine.set_color("#9aa5ae")
-            ax.add_patch(Rectangle((0, 0), zoom, zoom, fill=False, edgecolor="#9aa5ae", lw=0.8))
-
-            score = metrics(actual, fitted)
-            digits = 4 if target == "Quantity" else 2
-            ax.text(0.5, -0.23, f"MAE = {score['MAE']:.{digits}f}    RMSE = {score['RMSE']:.{digits}f}\n"
-                    f"R² = {score['R2']:.4f}", transform=ax.transAxes, ha="center", va="top",
-                    fontsize=11, linespacing=1.5)
+            ax.scatter(price, actual[target], s=42, color=gray, alpha=0.65,
+                       edgecolors="white", linewidths=0.4, zorder=2)
+            ax.scatter(price, actual[column], s=15, color=red, alpha=0.85,
+                       edgecolors="none", zorder=4)
+            ax.plot(grid.Unit_Price, line, color=blue, lw=2.1, zorder=3)
+            ax.set(xlabel="自变量 x：商品标价\n（数据集金额单位）",
+                   ylabel=f"因变量 y：{title[3:]}\n（{unit}）", title=title,
+                   xlim=(38, 42), ylim=(0, 1.08 * max(actual[target].max(), line.max())),
+                   xticks=[38, 39, 40, 41, 42])
+            ax.yaxis.set_major_locator(MaxNLocator(nbins=6, integer=True))
+            ax.grid(color="#e1e5e8", linewidth=0.6, zorder=0)
 
         legend = [
-            Line2D([], [], marker="o", linestyle="none", color=blue, markersize=5, label="测试明细"),
-            Line2D([], [], linestyle="--", color=orange, lw=1.3, label="理想预测  y = x"),
+            Line2D([], [], marker="o", linestyle="none", color=gray, markersize=6, label="实际值"),
+            Line2D([], [], marker="o", linestyle="none", color=red, markersize=5, label="商品中位数方案预测值"),
+            Line2D([], [], color=blue, lw=2.1, label="岭回归预测直线"),
         ]
-        fig.legend(handles=legend, loc="lower center", ncol=2, frameon=False, bbox_to_anchor=(0.5, 0.01))
+        fig.legend(handles=legend, loc="lower center", ncol=3, frameon=False, bbox_to_anchor=(0.5, 0.10))
+        fig.text(0.5, 0.045, "蓝线固定其余数值输入为历史中位数、类别输入为众数；红点为逐条测试预测。",
+                 ha="center", fontsize=11, color="#444444")
         FIGURE_DIRECTORY.mkdir(parents=True, exist_ok=True)
         fig.savefig(FIGURE_DIRECTORY / "05_actual_predicted.png", dpi=300, bbox_inches="tight")
         plt.close(fig)
@@ -118,7 +122,7 @@ def draw_figures(train, results, pred, winners):
             ax.text(value, i, label, va="center", fontsize=9)
     save(fig, "04_test_mae.png")
 
-    draw_predictions(pred, winners)
+    draw_predictions(pred)
 
     fig, axes = plt.subplots(1, 2, figsize=(8.4, 2.9))
     for ax, target, title in zip(axes, [qty, bill], ["（a）购买件数", "（b）明细金额"]):
@@ -144,5 +148,4 @@ def draw_figures(train, results, pred, winners):
 if __name__ == "__main__":
     directory = AUDIT_OUTPUT_PATH.parent
     predictions = pd.read_csv(directory / "predictions.csv")
-    selected = json.loads((directory / "selection.json").read_text(encoding="utf-8"))
-    draw_predictions(predictions, selected)
+    draw_predictions(predictions)
