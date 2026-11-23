@@ -4,13 +4,13 @@
 
 ## 环境与运行
 
-使用 Python 3.11（64 位）。NumPy、pandas、SciPy、scikit-learn、Matplotlib 和 Joblib 的复现版本记录在仓库根目录的 `requirements.txt`。
+使用 Python 3.11（64 位）。复现版本见[作业依赖](../requirements.txt)。
 
 从仓库根目录开始运行。
 
 ```text
-python -m pip install -r requirements.txt
-cd projects/bakery-regression
+python -m pip install -r homework-01/requirements.txt
+cd homework-01/bakery-regression
 python -m src.train
 ```
 
@@ -22,8 +22,8 @@ python -m src.train
 
 ```powershell
 py -3.11 -m venv .venv
-.\.venv\Scripts\python.exe -m pip install -r requirements.txt
-cd projects/bakery-regression
+.\.venv\Scripts\python.exe -m pip install -r .\homework-01\requirements.txt
+cd .\homework-01\bakery-regression
 ..\..\.venv\Scripts\python.exe -m src.train
 ..\..\.venv\Scripts\python.exe -m unittest discover -s tests -v
 ```
