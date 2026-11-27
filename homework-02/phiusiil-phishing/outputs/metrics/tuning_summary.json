@@ -1,0 +1,79 @@
+{
+  "Logistic Regression": {
+    "best_params": {
+      "C": 100
+    },
+    "best_cv_f1": 0.9998962704768743,
+    "n_samples": 188801,
+    "n_candidates": 5,
+    "n_fits": 25,
+    "elapsed_seconds": 62.820017499965616,
+    "scale_features": true,
+    "subsample": null
+  },
+  "Gaussian NB": {
+    "best_params": {
+      "var_smoothing": 1e-09
+    },
+    "best_cv_f1": 0.9837849833777076,
+    "n_samples": 188801,
+    "n_candidates": 5,
+    "n_fits": 25,
+    "elapsed_seconds": 20.255403299990576,
+    "scale_features": false,
+    "subsample": null
+  },
+  "Decision Tree": {
+    "best_params": {
+      "max_depth": 3,
+      "min_samples_leaf": 1
+    },
+    "best_cv_f1": 0.9999875961299924,
+    "n_samples": 188801,
+    "n_candidates": 20,
+    "n_fits": 100,
+    "elapsed_seconds": 91.13404309999896,
+    "scale_features": false,
+    "subsample": null
+  },
+  "Random Forest": {
+    "best_params": {
+      "max_depth": null,
+      "max_features": "sqrt",
+      "min_samples_leaf": 1,
+      "n_estimators": 500
+    },
+    "best_cv_f1": 0.9999875961299924,
+    "n_samples": 188801,
+    "n_candidates": 36,
+    "n_fits": 180,
+    "elapsed_seconds": 733.6199042000226,
+    "scale_features": false,
+    "subsample": null
+  },
+  "SVM (RBF)": {
+    "best_params": {
+      "C": 10,
+      "gamma": 0.01
+    },
+    "best_cv_f1": 0.9994672789489127,
+    "n_samples": 20000,
+    "n_candidates": 9,
+    "n_fits": 45,
+    "elapsed_seconds": 99.43093529995531,
+    "scale_features": true,
+    "subsample": "svc"
+  },
+  "Linear SVM": {
+    "best_params": {
+      "C": 10
+    },
+    "best_cv_f1": 0.9999142219914239,
+    "n_samples": 188801,
+    "n_candidates": 4,
+    "n_fits": 20,
+    "elapsed_seconds": 28.23028100002557,
+    "scale_features": true,
+    "subsample": null
+  }
+}

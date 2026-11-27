@@ -1,0 +1,57 @@
+{
+  "random_state": 42,
+  "outer_test_fold": 4,
+  "train": {
+    "n": 188801,
+    "phishing": 80886,
+    "legitimate": 107915,
+    "phishing_rate": 0.42841934099925316
+  },
+  "test": {
+    "n": 46994,
+    "phishing": 20059,
+    "legitimate": 26935,
+    "phishing_rate": 0.426841724475465
+  },
+  "groups_train": 176066,
+  "groups_test": 44020,
+  "group_overlap": 0,
+  "inner_folds": {
+    "0": {
+      "n": 37433,
+      "phishing": 15903,
+      "legitimate": 21530,
+      "phishing_rate": 0.424839045761761
+    },
+    "1": {
+      "n": 37796,
+      "phishing": 16117,
+      "legitimate": 21679,
+      "phishing_rate": 0.42642078526828237
+    },
+    "2": {
+      "n": 37694,
+      "phishing": 16125,
+      "legitimate": 21569,
+      "phishing_rate": 0.42778691568949967
+    },
+    "3": {
+      "n": 38732,
+      "phishing": 17157,
+      "legitimate": 21575,
+      "phishing_rate": 0.4429670556645668
+    },
+    "4": {
+      "n": 37146,
+      "phishing": 15584,
+      "legitimate": 21562,
+      "phishing_rate": 0.41953373176115866
+    }
+  },
+  "svc_subsample": {
+    "n": 20000,
+    "phishing": 8568,
+    "legitimate": 11432,
+    "phishing_rate": 0.4284
+  }
+}

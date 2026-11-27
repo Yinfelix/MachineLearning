@@ -1,0 +1,9 @@
+model,k,cv_f1_mean,cv_f1_std,cv_roc_auc_mean
+Logistic Regression,5,0.956178,0.003641,0.993596
+Logistic Regression,10,0.976999,0.002454,0.998031
+Logistic Regression,20,0.998997,0.000243,0.999980
+Logistic Regression,all,0.999838,0.000064,0.999992
+Random Forest,5,0.959286,0.003565,0.993965
+Random Forest,10,0.979798,0.004121,0.995959
+Random Forest,20,0.999350,0.000084,0.999984
+Random Forest,all,0.999858,0.000040,0.999999

@@ -1,0 +1,23 @@
+{
+  "rule": "URLSimilarityIndex < 100 -> phishing; else IsHTTPS == 0 -> phishing; else legitimate",
+  "test_metrics": {
+    "accuracy": 0.9998936034387369,
+    "precision": 1.0,
+    "recall": 0.9997507353307742,
+    "f1": 0.999875352130232,
+    "specificity": 1.0,
+    "fpr": 0.0,
+    "balanced_accuracy": 0.9998753676653871,
+    "tn": 26935,
+    "fp": 0,
+    "fn": 5,
+    "tp": 20054,
+    "roc_auc": NaN,
+    "pr_auc": NaN
+  },
+  "rule1_flag_rate": 0.42364982763757075,
+  "rule2_flag_rate": 0.0030855002766310593,
+  "phishing_caught_by_rule1": 19909,
+  "phishing_caught_by_rule2": 145,
+  "phishing_total": 20059
+}

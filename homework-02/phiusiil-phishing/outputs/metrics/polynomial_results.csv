@@ -1,0 +1,3 @@
+mode,n_features_in,cv_f1_mean,cv_f1_std,cv_roc_auc_mean
+linear,10,0.996902,0.000501,0.999858
+quadratic,10,0.997249,0.000327,0.999765

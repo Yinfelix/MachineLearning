@@ -1,0 +1,42 @@
+{
+  "model": "Random Forest on scheme V",
+  "params": {
+    "max_depth": null,
+    "max_features": "sqrt",
+    "min_samples_leaf": 1,
+    "n_estimators": 500
+  },
+  "chosen_threshold": 0.735,
+  "rule": "highest threshold with OOF recall >= 0.99",
+  "default_0.5": {
+    "accuracy": 0.9958292547984849,
+    "precision": 0.9964508872781804,
+    "recall": 0.9937683832693553,
+    "f1": 0.9951078274760383,
+    "specificity": 0.9973640245034342,
+    "fpr": 0.0026359754965658067,
+    "balanced_accuracy": 0.9955662038863948,
+    "tn": 26864,
+    "fp": 71,
+    "fn": 125,
+    "tp": 19934,
+    "roc_auc": 0.9986341332608436,
+    "pr_auc": 0.9988481092051431
+  },
+  "chosen": {
+    "accuracy": 0.9947014512490956,
+    "precision": 0.9988919109499346,
+    "recall": 0.9886833840171494,
+    "f1": 0.99376143111267,
+    "specificity": 0.999183218860219,
+    "fpr": 0.0008167811397809541,
+    "balanced_accuracy": 0.9939333014386842,
+    "tn": 26913,
+    "fp": 22,
+    "fn": 227,
+    "tp": 19832,
+    "roc_auc": 0.9986341332608436,
+    "pr_auc": 0.9988481092051431
+  },
+  "n_eligible_thresholds": 146
+}

@@ -1,0 +1,25 @@
+{
+  "best_test_f1": 1.0,
+  "best_row": {
+    "model": "Decision Tree",
+    "scheme": "A",
+    "test_f1": 1.0,
+    "test_accuracy": 1.0,
+    "test_fpr": 0.0
+  },
+  "worst_test_f1": 0.942114,
+  "scheme_mean_f1": {
+    "A": 0.9969471666666667,
+    "B": 0.9899555000000001,
+    "C": 0.9986606666666665,
+    "D": 0.9828818333333333
+  },
+  "model_mean_f1": {
+    "Decision Tree": 0.99083725,
+    "Gaussian NB": 0.96830175,
+    "Linear SVM": 0.9985999999999999,
+    "Logistic Regression": 0.99861825,
+    "Random Forest": 0.99919475,
+    "SVM (RBF)": 0.99711575
+  }
+}

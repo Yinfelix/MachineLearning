@@ -1,0 +1,7 @@
+feature_a,feature_b,rho,abs_rho
+NoOfObfuscatedChar,ObfuscationRatio,1.00000,1.00000
+HasObfuscation,NoOfObfuscatedChar,1.00000,1.00000
+HasObfuscation,ObfuscationRatio,1.00000,1.00000
+NoOfDegitsInURL,DegitRatioInURL,0.99666,0.99666
+URLLength,NoOfLettersInURL,0.97211,0.97211
+DomainTitleMatchScore,URLTitleMatchScore,0.96381,0.96381

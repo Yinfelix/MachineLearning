@@ -1,0 +1,10 @@
+{
+  "pool": {
+    "n": 151368,
+    "phishing": 64983
+  },
+  "validation": {
+    "n": 37433,
+    "phishing": 15903
+  }
+}

@@ -1,0 +1,14 @@
+# Raw data (download/extract separately; see README)
+data/raw/*.csv
+data/raw/*.zip
+
+# Fitted models are large and reproducible from scripts
+outputs/models/*.joblib
+
+# Logs
+logs/
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/

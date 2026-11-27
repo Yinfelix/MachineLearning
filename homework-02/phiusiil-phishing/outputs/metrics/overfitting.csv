@@ -1,0 +1,6 @@
+model,train_f1,val_f1,gap
+Logistic Regression,0.996467,0.996432,0.000035
+Gaussian NB,0.624710,0.624350,0.000359
+Decision Tree,0.998690,0.993277,0.005414
+Random Forest,0.998690,0.995306,0.003385
+SVM (RBF),0.991240,0.990371,0.000869

@@ -1,0 +1,18 @@
+{
+  "top10_rf_importance": [
+    "NoOfExternalRef",
+    "LineOfCode",
+    "NoOfImage",
+    "NoOfJS",
+    "NoOfSelfRef",
+    "HasSocialNet",
+    "NoOfCSS",
+    "NoOfOtherSpecialCharsInURL",
+    "HasCopyrightInfo",
+    "IsHTTPS"
+  ],
+  "tree_root_feature": "NoOfExternalRef",
+  "shap_sample": 2000,
+  "permutation_sample": 20000,
+  "permutation_repeats": 5
+}

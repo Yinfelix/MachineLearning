@@ -1,0 +1,5 @@
+{
+  "n_numeric_features": 50,
+  "n_pairs_abs_rho_ge_095": 6,
+  "n_pairs_abs_rho_ge_090": 8
+}

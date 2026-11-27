@@ -1,0 +1,131 @@
+{
+  "shape": [
+    235795,
+    56
+  ],
+  "n_rows": 235795,
+  "n_columns": 56,
+  "n_features_excluding_text": 51,
+  "missing_total": 0,
+  "missing_by_col": {},
+  "duplicate_rows": 0,
+  "unique_url": 235370,
+  "duplicate_url_rows": 425,
+  "unique_domains": 220086,
+  "rows_in_repeated_domains": 21235,
+  "max_domain_group": 1197,
+  "domain_label_nunique_counts": {
+    "1": 220032,
+    "2": 54
+  },
+  "label_counts": {
+    "0": 100945,
+    "1": 134850
+  },
+  "label_meaning": {
+    "1": "legitimate",
+    "0": "phishing"
+  },
+  "phishing_rate": 0.42810492164804176,
+  "url_similarity_by_label": {
+    "0": {
+      "mean": 49.61697250897354,
+      "std": 22.57208178127446,
+      "min": 0.155574352,
+      "max": 100.0,
+      "pct_at_100": 0.007786418346624399
+    },
+    "1": {
+      "mean": 100.0,
+      "std": 0.0,
+      "min": 100.0,
+      "max": 100.0,
+      "pct_at_100": 1.0
+    }
+  },
+  "phishing_with_similarity_100": 786,
+  "unique_tld": 695,
+  "top_tld": {
+    "com": 112554,
+    "org": 18793,
+    "net": 7097,
+    "app": 6508,
+    "uk": 6395,
+    "co": 5422,
+    "io": 4201,
+    "de": 3996,
+    "ru": 3875,
+    "au": 2979,
+    "dev": 2345,
+    "top": 2329,
+    "jp": 2219,
+    "it": 1887,
+    "edu": 1861
+  },
+  "is_https_by_label": {
+    "0": 0.4922383476150379,
+    "1": 1.0
+  },
+  "dtypes": {
+    "int64": 41,
+    "float64": 10,
+    "object": 5
+  },
+  "train_test": {
+    "random_state": 42,
+    "outer_test_fold": 4,
+    "train": {
+      "n": 188801,
+      "phishing": 80886,
+      "legitimate": 107915,
+      "phishing_rate": 0.42841934099925316
+    },
+    "test": {
+      "n": 46994,
+      "phishing": 20059,
+      "legitimate": 26935,
+      "phishing_rate": 0.426841724475465
+    },
+    "groups_train": 176066,
+    "groups_test": 44020,
+    "group_overlap": 0,
+    "inner_folds": {
+      "0": {
+        "n": 37433,
+        "phishing": 15903,
+        "legitimate": 21530,
+        "phishing_rate": 0.424839045761761
+      },
+      "1": {
+        "n": 37796,
+        "phishing": 16117,
+        "legitimate": 21679,
+        "phishing_rate": 0.42642078526828237
+      },
+      "2": {
+        "n": 37694,
+        "phishing": 16125,
+        "legitimate": 21569,
+        "phishing_rate": 0.42778691568949967
+      },
+      "3": {
+        "n": 38732,
+        "phishing": 17157,
+        "legitimate": 21575,
+        "phishing_rate": 0.4429670556645668
+      },
+      "4": {
+        "n": 37146,
+        "phishing": 15584,
+        "legitimate": 21562,
+        "phishing_rate": 0.41953373176115866
+      }
+    },
+    "svc_subsample": {
+      "n": 20000,
+      "phishing": 8568,
+      "legitimate": 11432,
+      "phishing_rate": 0.4284
+    }
+  }
+}
