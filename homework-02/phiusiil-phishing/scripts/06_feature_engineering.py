@@ -23,7 +23,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from src import config as C
 from src import data, evaluate, models, plots
 from src.evaluate import save_json
-from src.preprocess import make_pipeline, make_preprocessor
+from src.preprocess import make_preprocessor
 
 
 def tuned_pipeline(name: str, scheme="B", tuning=None):
@@ -33,7 +33,7 @@ def tuned_pipeline(name: str, scheme="B", tuning=None):
     return pipe
 
 
-def main() -> None:
+def main(*, explanations_only=False) -> None:
     tuning = json.loads((C.METRIC_DIR / "tuning_summary.json").read_text(encoding="utf-8"))
     df = data.load_raw()
     X, y, _ = data.get_xy(df)
@@ -46,95 +46,39 @@ def main() -> None:
     val_idx = train_idx[fold_id[train_idx] == 0]
     X_val, y_val = X.iloc[val_idx].reset_index(drop=True), y.iloc[val_idx].reset_index(drop=True)
 
-    # ------------------------------------------- 1. univariate / mutual info
-    mi_sample = X_train.sample(n=min(50000, len(X_train)), random_state=C.RANDOM_STATE)
-    mi_y = y_train.loc[mi_sample.index]
-    from sklearn.feature_selection import mutual_info_classif
-    numeric_b, _ = C.scheme_columns("B")
-    mi = mutual_info_classif(mi_sample[numeric_b], mi_y, random_state=C.RANDOM_STATE, discrete_features="auto")
-    mi_df = pd.DataFrame({"feature": numeric_b, "mutual_info": mi}).sort_values("mutual_info", ascending=False)
-    mi_df.to_csv(C.METRIC_DIR / "mutual_info.csv", index=False, float_format="%.6f")
+    numeric_b, categorical_b = C.scheme_columns("B")
+    if not explanations_only:
+        run_selection(X_train, y_train, X, y, splits, fold_id, tuning, cv, numeric_b)
 
-    # -------------------------------------------- 2. filter selection (K best)
-    rows = []
-    for name in ["Logistic Regression", "Random Forest"]:
-        for k in [5, 10, 20, "all"]:
-            pipe = tuned_pipeline(name, tuning=tuning)
-            if k != "all":
-                pipe.steps.insert(-1, ("select", SelectKBest(f_classif, k=k)))
-            cv_df = evaluate.cross_validate_pipeline(pipe, X_train, y_train, cv)
-            rows.append({"model": name, "k": k, "cv_f1_mean": cv_df["f1"].mean(), "cv_f1_std": cv_df["f1"].std(ddof=0),
-                         "cv_roc_auc_mean": cv_df["roc_auc"].mean()})
-            print(f"[K] {name} k={k} F1={cv_df['f1'].mean():.4f}", flush=True)
-    k_df = pd.DataFrame(rows)
-    k_df.to_csv(C.METRIC_DIR / "feature_selection_k.csv", index=False, float_format="%.6f")
-
-    # ------------------------------------------------------ 3. L1 LR path
-    # A 50k stratified subsample keeps the path experiment fast; the number of
-    # non-zero coefficients is stable at this size and is used only qualitatively.
-    l1_sample = X_train.sample(n=min(50000, len(X_train)), random_state=C.RANDOM_STATE)
-    y_l1 = y_train.loc[l1_sample.index]
-    l1_rows = []
-    pre = make_preprocessor(*C.scheme_columns("B"), scale=True)
-    Xt = pre.fit_transform(l1_sample)
-    for Cval in [0.001, 0.003, 0.01, 0.03, 0.1, 0.3, 1.0]:
-        lr = LogisticRegression(penalty="l1", solver="liblinear", C=Cval, max_iter=1000, random_state=C.RANDOM_STATE)
-        lr.fit(Xt, y_l1)
-        l1_rows.append({"C": Cval, "nonzero": int(np.sum(np.abs(lr.coef_) > 1e-8)),
-                        "train_f1": float(evaluate.metrics_dict(y_l1, lr.predict(Xt))["f1"])})
-    pd.DataFrame(l1_rows).to_csv(C.METRIC_DIR / "l1_path.csv", index=False, float_format="%.6f")
-
-    # ------------------------------------------------------------- 4. PCA
-    rows = []
-    for name in ["Logistic Regression", "SVM (RBF)"]:
-        spec = models.MODEL_SPECS[name]
-        if spec["subsample"] == "svc":
-            sub = splits["svc_idx"]
-            ids = fold_id[sub]
-            X_fit, y_fit = X.iloc[sub].reset_index(drop=True), y.iloc[sub].reset_index(drop=True)
-            cv_fit = []
-            for k in sorted(set(ids.tolist())):
-                val = (ids == k).nonzero()[0]
-                tr = (ids != k).nonzero()[0]
-                cv_fit.append((tr, val))
-        else:
-            X_fit, y_fit, cv_fit = X_train, y_train, cv
-        for var in [0.90, 0.95, 0.99]:
-            pipe = tuned_pipeline(name, tuning=tuning)
-            pipe.steps.insert(-1, ("pca", PCA(n_components=var, random_state=C.RANDOM_STATE)))
-            cv_df = evaluate.cross_validate_pipeline(pipe, X_fit, y_fit, cv_fit)
-            full = clone(pipe).fit(X_fit, y_fit)
-            ncomp = int(full.named_steps["pca"].n_components_)
-            rows.append({"model": name, "variance": var, "n_components": ncomp,
-                         "cv_f1_mean": cv_df["f1"].mean(), "cv_f1_std": cv_df["f1"].std(ddof=0),
-                         "cv_roc_auc_mean": cv_df["roc_auc"].mean()})
-            print(f"[PCA] {name} var={var} ncomp={ncomp} F1={cv_df['f1'].mean():.4f}", flush=True)
-    pca_df = pd.DataFrame(rows)
-    pca_df.to_csv(C.METRIC_DIR / "pca_results.csv", index=False, float_format="%.6f")
-
-    # ------------------------------------------------- 5. polynomial expansion
-    # Fit the RF to rank features, then compare linear vs quadratic LR on top-10.
-    rf = tuned_pipeline("Random Forest", tuning=tuning).fit(X_train, y_train)
+    # Select the ten numeric features using only each fold's training labels.
+    fold_rows = []
+    for fold, (tr, va) in enumerate(cv):
+        forest = tuned_pipeline("Random Forest", tuning=tuning).fit(X_train.iloc[tr], y_train.iloc[tr])
+        names = forest.named_steps["pre"].get_feature_names_out()
+        importance = pd.Series(forest.named_steps["model"].feature_importances_, index=names)
+        columns = importance.loc[numeric_b].nlargest(10).index.tolist()
+        print(f"[top-10] fold {fold}: {columns}", flush=True)
+        if fold == 0:
+            rf, top10 = forest, columns
+        for mode in ["linear", "quadratic"]:
+            steps = [("pre", make_preprocessor(columns, [], scale=True))]
+            if mode == "quadratic":
+                steps.extend([("poly", PolynomialFeatures(2, include_bias=False)), ("scale", StandardScaler())])
+            model = models.MODEL_SPECS["Logistic Regression"]["factory"]()
+            model.set_params(**tuning["Logistic Regression"]["best_params"])
+            pipe = Pipeline(steps + [("model", model)])
+            pipe.fit(X_train.iloc[tr], y_train.iloc[tr])
+            valid = X_train.iloc[va]
+            metrics = evaluate.metrics_dict(y_train.iloc[va], pipe.predict(valid), evaluate.score_of(pipe, valid))
+            fold_rows.append({"fold": fold, "mode": mode, "top10": "|".join(columns),
+                              "f1": metrics["f1"], "roc_auc": metrics["roc_auc"]})
+    folds = pd.DataFrame(fold_rows)
+    folds.to_csv(C.METRIC_DIR / "polynomial_folds.csv", index=False)
+    summary = folds.groupby("mode").agg(cv_f1_mean=("f1", "mean"), cv_f1_std=("f1", lambda x: x.std(ddof=0)),
+                                         cv_roc_auc_mean=("roc_auc", "mean"))
+    summary["n_features_in"] = 10
+    summary.to_csv(C.METRIC_DIR / "polynomial_results.csv", float_format="%.6f")
     names_out = list(rf.named_steps["pre"].get_feature_names_out())
-    imp_all = pd.Series(rf.named_steps["model"].feature_importances_, index=names_out).sort_values(ascending=False)
-    imp = imp_all[imp_all.index.isin(numeric_b)]
-    top10 = imp.head(10).index.tolist()
-    poly_rows = []
-    for mode in ["linear", "quadratic"]:
-        steps = [("num", make_preprocessor(top10, [], scale=True))]
-        if mode == "quadratic":
-            steps.append(("poly", PolynomialFeatures(degree=2, include_bias=False)))
-            steps.append(("scale2", StandardScaler()))
-        lr_best = tuning["Logistic Regression"]["best_params"]
-        pipe = Pipeline(steps + [("model", LogisticRegression(solver="liblinear", max_iter=3000,
-                                                               C=lr_best["C"],
-                                                               penalty=lr_best.get("penalty", "l2"),
-                                                               random_state=C.RANDOM_STATE))])
-        cv_df = evaluate.cross_validate_pipeline(pipe, X_train[top10], y_train, cv)
-        poly_rows.append({"mode": mode, "n_features_in": len(top10), "cv_f1_mean": cv_df["f1"].mean(),
-                          "cv_f1_std": cv_df["f1"].std(ddof=0), "cv_roc_auc_mean": cv_df["roc_auc"].mean()})
-        print(f"[POLY] {mode} F1={cv_df['f1'].mean():.4f}", flush=True)
-    pd.DataFrame(poly_rows).to_csv(C.METRIC_DIR / "polynomial_results.csv", index=False, float_format="%.6f")
 
     # -------------------------------------- 6. impurity vs permutation importance
     tree_imp = pd.DataFrame({"feature": names_out, "importance": rf.named_steps["model"].feature_importances_}).sort_values(
@@ -142,7 +86,7 @@ def main() -> None:
     )
     tree_imp.to_csv(C.METRIC_DIR / "rf_impurity_importance.csv", index=False, float_format="%.8f")
 
-    perm_sample = X_val.sample(n=min(20000, len(X_val)), random_state=C.RANDOM_STATE)
+    perm_sample = X_val[numeric_b + categorical_b].sample(n=min(20000, len(X_val)), random_state=C.RANDOM_STATE)
     perm_y = y_val.loc[perm_sample.index]
     perm = permutation_importance(rf, perm_sample, perm_y, scoring="f1", n_repeats=5,
                                   random_state=C.RANDOM_STATE, n_jobs=1)
@@ -194,6 +138,8 @@ def main() -> None:
     save_json(
         {
             "top10_rf_importance": top10,
+            "explanation_validation_fold": 0,
+            "tree_root_feature": names_out[tree.tree_.feature[0]],
             "shap_sample": int(len(shap_sample)),
             "permutation_sample": int(len(perm_sample)),
             "permutation_repeats": 5,
@@ -202,6 +148,71 @@ def main() -> None:
     )
     print("feature engineering complete", flush=True)
 
+
+def run_selection(X_train, y_train, X, y, splits, fold_id, tuning, cv, numeric_b):
+    # ------------------------------------------- 1. univariate / mutual info
+    mi_sample = X_train.sample(n=min(50000, len(X_train)), random_state=C.RANDOM_STATE)
+    mi_y = y_train.loc[mi_sample.index]
+    from sklearn.feature_selection import mutual_info_classif
+    mi = mutual_info_classif(mi_sample[numeric_b], mi_y, random_state=C.RANDOM_STATE, discrete_features="auto")
+    mi_df = pd.DataFrame({"feature": numeric_b, "mutual_info": mi}).sort_values("mutual_info", ascending=False)
+    mi_df.to_csv(C.METRIC_DIR / "mutual_info.csv", index=False, float_format="%.6f")
+
+    # -------------------------------------------- 2. filter selection (K best)
+    rows = []
+    for name in ["Logistic Regression", "Random Forest"]:
+        for k in [5, 10, 20, "all"]:
+            pipe = tuned_pipeline(name, tuning=tuning)
+            if k != "all":
+                pipe.steps.insert(-1, ("select", SelectKBest(f_classif, k=k)))
+            cv_df = evaluate.cross_validate_pipeline(pipe, X_train, y_train, cv)
+            rows.append({"model": name, "k": k, "cv_f1_mean": cv_df["f1"].mean(), "cv_f1_std": cv_df["f1"].std(ddof=0),
+                         "cv_roc_auc_mean": cv_df["roc_auc"].mean()})
+            print(f"[K] {name} k={k} F1={cv_df['f1'].mean():.4f}", flush=True)
+    k_df = pd.DataFrame(rows)
+    k_df.to_csv(C.METRIC_DIR / "feature_selection_k.csv", index=False, float_format="%.6f")
+
+    # ------------------------------------------------------ 3. L1 LR path
+    # A fixed random sample of up to 50k training rows is used for this descriptive path.
+    l1_sample = X_train.sample(n=min(50000, len(X_train)), random_state=C.RANDOM_STATE)
+    y_l1 = y_train.loc[l1_sample.index]
+    l1_rows = []
+    pre = make_preprocessor(*C.scheme_columns("B"), scale=True)
+    Xt = pre.fit_transform(l1_sample)
+    for Cval in [0.001, 0.003, 0.01, 0.03, 0.1, 0.3, 1.0]:
+        lr = LogisticRegression(penalty="l1", solver="liblinear", C=Cval, max_iter=1000, random_state=C.RANDOM_STATE)
+        lr.fit(Xt, y_l1)
+        l1_rows.append({"C": Cval, "nonzero": int(np.sum(np.abs(lr.coef_) > 1e-8)),
+                        "train_f1": float(evaluate.metrics_dict(y_l1, lr.predict(Xt))["f1"])})
+    pd.DataFrame(l1_rows).to_csv(C.METRIC_DIR / "l1_path.csv", index=False, float_format="%.6f")
+
+    # ------------------------------------------------------------- 4. PCA
+    rows = []
+    for name in ["Logistic Regression", "SVM (RBF)"]:
+        spec = models.MODEL_SPECS[name]
+        if spec["subsample"] == "svc":
+            sub = splits["svc_idx"]
+            ids = fold_id[sub]
+            X_fit, y_fit = X.iloc[sub].reset_index(drop=True), y.iloc[sub].reset_index(drop=True)
+            cv_fit = []
+            for k in sorted(set(ids.tolist())):
+                val = (ids == k).nonzero()[0]
+                tr = (ids != k).nonzero()[0]
+                cv_fit.append((tr, val))
+        else:
+            X_fit, y_fit, cv_fit = X_train, y_train, cv
+        for var in [0.90, 0.95, 0.99]:
+            pipe = tuned_pipeline(name, tuning=tuning)
+            pipe.steps.insert(-1, ("pca", PCA(n_components=var, random_state=C.RANDOM_STATE)))
+            cv_df = evaluate.cross_validate_pipeline(pipe, X_fit, y_fit, cv_fit)
+            full = clone(pipe).fit(X_fit, y_fit)
+            ncomp = int(full.named_steps["pca"].n_components_)
+            rows.append({"model": name, "variance": var, "n_components": ncomp,
+                         "cv_f1_mean": cv_df["f1"].mean(), "cv_f1_std": cv_df["f1"].std(ddof=0),
+                         "cv_roc_auc_mean": cv_df["roc_auc"].mean()})
+            print(f"[PCA] {name} var={var} ncomp={ncomp} F1={cv_df['f1'].mean():.4f}", flush=True)
+    pca_df = pd.DataFrame(rows)
+    pca_df.to_csv(C.METRIC_DIR / "pca_results.csv", index=False, float_format="%.6f")
 
 if __name__ == "__main__":
     main()

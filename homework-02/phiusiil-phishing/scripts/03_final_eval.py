@@ -8,7 +8,6 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
-from sklearn.base import clone
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
@@ -66,13 +65,9 @@ def main() -> None:
             cv_df = evaluate.cross_validate_pipeline(pipe, X_fit, y_fit, cv)
             agg = evaluate.aggregate_cv(cv_df)
 
-            test_metrics, scores = evaluate.evaluate_on_test(pipe, X_fit, y_fit, X_test, y_test)
-            preds = (np.asarray(scores) >= 0.5).astype(int) if name in ("SVM (RBF)", "Linear SVM") else None
-            # Threshold 0.5 is not meaningful for decision-function SVMs; use the
-            # model's own predict for the stored label and metrics above.
-            est = clone(pipe).fit(X_fit, y_fit)
-            preds = est.predict(X_test)
-
+            test_metrics, scores, preds = evaluate.evaluate_on_test(
+                pipe, X_fit, y_fit, X_test, y_test, return_predictions=True
+            )
             row = {
                 "model": name,
                 "scheme": scheme,

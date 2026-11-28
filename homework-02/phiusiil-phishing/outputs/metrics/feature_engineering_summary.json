@@ -11,6 +11,7 @@
     "HasCopyrightInfo",
     "IsHTTPS"
   ],
+  "explanation_validation_fold": 0,
   "tree_root_feature": "NoOfExternalRef",
   "shap_sample": 2000,
   "permutation_sample": 20000,

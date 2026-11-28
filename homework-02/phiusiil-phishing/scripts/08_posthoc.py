@@ -1,7 +1,7 @@
 """Post-hoc diagnostics for the two collapse cases on scheme V.
 
 Both choices (tree depth, NB threshold) are made on training data only; the
-test set is used once to report the resulting performance.
+original holdout is reused for descriptive comparisons after the main analysis.
 """
 from __future__ import annotations
 
@@ -66,6 +66,7 @@ def main():
 
     save_json(
         {
+            "scope": "Exploratory follow-up on the previously evaluated holdout",
             "dt_V": {
                 "depth_selection": depth_rows,
                 "best_depth_by_validation": best_depth,

@@ -31,3 +31,11 @@ def test_svc_subsample_is_stratified_subset_of_train():
     assert len(sub) == C.SVC_SUBSAMPLE
     assert set(sub).issubset(set(splits["train_idx"].tolist()))
     assert abs(y[sub].mean() - y[splits["train_idx"]].mean()) < 0.01
+
+
+def test_inner_validation_domains_are_disjoint():
+    domains = pd.read_csv(C.DATA_PATH, usecols=["Domain"])["Domain"].str.lower().str.rstrip(".")
+    splits = data.load_splits()
+    tr = splits["train_idx"]
+    groups = pd.DataFrame({"domain": domains.iloc[tr], "fold": splits["inner_fold_id"][tr]})
+    assert groups.groupby("domain")["fold"].nunique().max() == 1

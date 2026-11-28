@@ -28,12 +28,8 @@ def tuned_pipeline(name: str, scheme="V", tuning=None):
     pipe = models.build_pipeline(name, scheme)
     best = tuning[name]["best_params"]
     pipe.set_params(**{f"model__{k}": v for k, v in best.items()})
-    # Fairness override: depth=3 was selected on scheme A (a single
-    # URLSimilarityIndex split) and severely underfits scheme V.  For the
-    # robustness curves we use the depth re-selected on V (unlimited), so the
-    # experiment measures robustness rather than a known underfit.
     if name == "Decision Tree" and scheme == "V":
-        pipe.set_params(model__max_depth=None)
+        pipe.set_params(model__max_depth=tuning[name]["robustness_depth"])
     return pipe
 
 
@@ -44,22 +40,39 @@ def evaluate_val(pipe, X_pool, y_pool, X_val, y_val) -> dict:
     return evaluate.metrics_dict(y_val, pred, score)
 
 
+def select_depth(X, y, pool, folds, tuning):
+    """Tune V depth inside the sampling pool, separate from robustness validation."""
+    fit_idx = pool[folds[pool] != 0]
+    select_idx = pool[folds[pool] == 0]
+    pipe = models.build_pipeline("Decision Tree", "V")
+    pipe.set_params(**{"model__" + k: v for k, v in tuning["Decision Tree"]["best_params"].items()})
+    scores = []
+    for depth in [3, 4, 5, 6, 8, 10, 12, 16, 20, None]:
+        pipe.set_params(model__max_depth=depth)
+        pipe.fit(X.iloc[fit_idx], y.iloc[fit_idx])
+        metrics = evaluate.metrics_dict(y.iloc[select_idx], pipe.predict(X.iloc[select_idx]))
+        scores.append({"max_depth": depth, "f1": metrics["f1"]})
+    return max(scores, key=lambda row: row["f1"])["max_depth"], scores
+
+
 def main() -> None:
     tuning = json.loads((C.METRIC_DIR / "tuning_summary.json").read_text(encoding="utf-8"))
     df = data.load_raw()
     X, y, _ = data.get_xy(df)
     splits = data.ensure_splits(df)
-    train_idx, test_idx = splits["train_idx"], splits["test_idx"]
+    train_idx = splits["train_idx"]
     fold_id = splits["inner_fold_id"]
 
-    # Fixed internal validation = inner fold 0; the remaining four folds form the
+    # Fixed internal validation = inner fold 1; the remaining four folds form the
     # sampling pool.  The independent test set is never used here.
-    val_idx = train_idx[fold_id[train_idx] == 0]
-    pool_idx = train_idx[fold_id[train_idx] != 0]
+    val_idx = train_idx[fold_id[train_idx] == 1]
+    pool_idx = train_idx[fold_id[train_idx] != 1]
     X_pool, y_pool = X.iloc[pool_idx].reset_index(drop=True), y.iloc[pool_idx].reset_index(drop=True)
     X_val, y_val = X.iloc[val_idx].reset_index(drop=True), y.iloc[val_idx].reset_index(drop=True)
+    depth, depth_scores = select_depth(X, y, pool_idx, fold_id, tuning)
+    tuning["Decision Tree"]["robustness_depth"] = depth
     save_json(
-        {"pool": {"n": len(pool_idx), "phishing": int(y_pool.sum())},
+        {"selected_depth": depth, "depth_scores": depth_scores, "validation_fold": 1, "depth_selection_fold": 0, "pool": {"n": len(pool_idx), "phishing": int(y_pool.sum())},
          "validation": {"n": len(val_idx), "phishing": int(y_val.sum())}},
         C.METRIC_DIR / "robustness_setup.json",
     )
@@ -69,7 +82,7 @@ def main() -> None:
     for name in ["Logistic Regression", "Decision Tree", "Random Forest"]:
         pipe = tuned_pipeline(name, tuning=tuning)
         for frac in FRACTIONS:
-            for seed in RNG_SEEDS:
+            for seed in (RNG_SEEDS if frac < 1 else [C.RANDOM_STATE]):
                 if frac >= 1.0:
                     sub = pool_idx
                 else:
@@ -125,7 +138,7 @@ def main() -> None:
 
     # ------------------------------------------------------------- 4. outliers
     outlier_feats = [c for c in ["URLLength", "DomainLength", "NoOfOtherSpecialCharsInURL"] if c in numeric_b]
-    X_out = X_val.copy()
+    X_out = X_val.astype({column: float for column in outlier_feats})
     out_rng = np.random.RandomState(C.RANDOM_STATE)
     pick = out_rng.choice(len(X_out), size=max(1, int(0.05 * len(X_out))), replace=False)
     for c in outlier_feats:
@@ -148,12 +161,9 @@ def main() -> None:
 
     # ------------------------------------------------------ 5. TLD transfer
     top_tld = X_pool["TLD"].value_counts().head(20).index
-    common_idx = pool_idx[X.iloc[pool_idx]["TLD"].isin(top_tld).to_numpy()]
-    rare_test_idx = test_idx[X.iloc[test_idx]["TLD"].notna().to_numpy()]
-    rare_test_idx = rare_test_idx[~X.iloc[rare_test_idx]["TLD"].isin(top_tld).to_numpy()]
-    common_tr, common_te = train_test_split(
-        common_idx, test_size=0.2, stratify=y.iloc[common_idx], random_state=C.RANDOM_STATE
-    )
+    common_tr = pool_idx[X_pool["TLD"].isin(top_tld).to_numpy()]
+    is_common = X_val["TLD"].isin(top_tld).to_numpy()
+    common_te, rare_test_idx = val_idx[is_common], val_idx[~is_common]
     X_ctr, y_ctr = X.iloc[common_tr], y.iloc[common_tr]
     X_cte, y_cte = X.iloc[common_te], y.iloc[common_te]
     X_rare, y_rare = X.iloc[rare_test_idx], y.iloc[rare_test_idx]
@@ -165,7 +175,8 @@ def main() -> None:
             pred = est.predict(Xeval)
             score = evaluate.score_of(est, Xeval)
             m = evaluate.metrics_dict(yeval, pred, score)
-            rows.append({"model": name, "split": split_name, "n": len(yeval), "phishing_rate": float(yeval.mean()),
+            rows.append({"model": name, "split": split_name, "validation_fold": 1, "grouping": "Domain",
+                         "tld_group": "common" if split_name == "随机划分" else "rare", "n": len(yeval), "phishing_rate": float(yeval.mean()),
                          "f1": m["f1"], "roc_auc": m["roc_auc"], "fpr": m["fpr"], "recall": m["recall"]})
             print(f"[TLD] {name:20s} {split_name:6s} n={len(yeval):5d} F1={m['f1']:.4f}", flush=True)
     tld_df = pd.DataFrame(rows)
@@ -177,23 +188,11 @@ def main() -> None:
     for name in C.MODEL_ORDER:
         spec = models.MODEL_SPECS[name]
         pipe = tuned_pipeline(name, tuning=tuning)
+        subset = pool_idx
         if spec["subsample"] == "svc":
-            sub = splits["svc_idx"]
-            ids = fold_id[sub]
-            X_fit, y_fit = X.iloc[sub].reset_index(drop=True), y.iloc[sub].reset_index(drop=True)
-            cv = []
-            for k in sorted(set(ids.tolist())):
-                val = (ids == k).nonzero()[0]
-                tr = (ids != k).nonzero()[0]
-                cv.append((tr, val))
-        else:
-            X_fit, y_fit = X_pool, y_pool
-            cv = []
-            ids = fold_id[pool_idx]
-            for k in sorted(set(ids.tolist())):
-                val = (ids == k).nonzero()[0]
-                tr = (ids != k).nonzero()[0]
-                cv.append((tr, val))
+            subset = np.intersect1d(subset, splits["svc_idx"])
+        X_fit, y_fit = X.iloc[subset], y.iloc[subset]
+        cv = data.inner_cv_splits(subset, fold_id)
         tr_s, va_s = [], []
         for tr, va in cv:
             est = clone(pipe).fit(X_fit.iloc[tr], y_fit.iloc[tr])

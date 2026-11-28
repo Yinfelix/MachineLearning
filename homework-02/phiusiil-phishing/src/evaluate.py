@@ -51,8 +51,8 @@ def metrics_dict(y_true, y_pred, y_score=None) -> dict:
         out["roc_auc"] = float(roc_auc_score(y_true, y_score))
         out["pr_auc"] = float(average_precision_score(y_true, y_score))
     else:
-        out["roc_auc"] = float("nan")
-        out["pr_auc"] = float("nan")
+        out["roc_auc"] = None
+        out["pr_auc"] = None
     return out
 
 
@@ -73,7 +73,7 @@ def cross_validate_pipeline(pipeline, X, y, splits) -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
-def evaluate_on_test(pipeline, X_train, y_train, X_test, y_test) -> tuple[dict, np.ndarray]:
+def evaluate_on_test(pipeline, X_train, y_train, X_test, y_test, *, return_predictions=False):
     est = clone(pipeline)
     t0 = time.perf_counter()
     est.fit(X_train, y_train)
@@ -84,6 +84,8 @@ def evaluate_on_test(pipeline, X_train, y_train, X_test, y_test) -> tuple[dict, 
     pred_s = time.perf_counter() - t0
     out = metrics_dict(y_test, pred, score)
     out.update({"fit_seconds": fit_s, "predict_seconds": pred_s})
+    if return_predictions:
+        return out, score, pred
     return out, score
 
 
@@ -98,7 +100,7 @@ def aggregate_cv(cv_df: pd.DataFrame) -> dict:
 
 def save_json(obj, path: Path) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(obj, indent=2, ensure_ascii=False, default=_json_default), encoding="utf-8")
+    path.write_text(json.dumps(obj, indent=2, ensure_ascii=False, allow_nan=False, default=_json_default), encoding="utf-8")
 
 
 def _json_default(o):

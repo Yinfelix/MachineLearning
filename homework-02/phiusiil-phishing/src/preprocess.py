@@ -19,12 +19,13 @@ class FrequencyEncoder(BaseEstimator, TransformerMixin):
     passed to ``fit``, so the encoder is safe inside cross-validation.
     """
 
-    def __init__(self, column: str | None = None):
+    def __init__(self, column: str | None = None, normalize: bool = False):
         self.column = column
+        self.normalize = normalize
 
     def fit(self, X, y=None):
         s = self._to_series(X)
-        self.counts_ = s.value_counts()
+        self.counts_ = s.value_counts(normalize=self.normalize)
         self.n_ = len(s)
         return self
 

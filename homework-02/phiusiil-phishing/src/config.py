@@ -3,7 +3,6 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import numpy as np
 
 # --------------------------------------------------------------------------- #
 # Paths
@@ -165,22 +164,8 @@ SCHEMES = {
     },
 }
 
-# Long-tailed count features get log1p before scaling.  Kept small and explicit
-# so the transform is auditable; tree models receive the same transform only
-# where noted in the report (they are scale-invariant to it otherwise).
-LOG_FEATURES = [
-    "URLLength",
-    "DomainLength",
-    "NoOfSubDomain",
-    "LineOfCode",
-    "LargestLineLength",
-    "NoOfImage",
-    "NoOfCSS",
-    "NoOfJS",
-    "NoOfSelfRef",
-    "NoOfEmptyRef",
-    "NoOfExternalRef",
-]
+# The evaluated pipelines use counts on their original scale.
+LOG_FEATURES: list[str] = []
 
 MODEL_ORDER = ["Logistic Regression", "Gaussian NB", "Decision Tree", "Random Forest", "SVM (RBF)"]
 SCHEME_ORDER = ["A", "B", "C", "D"]
