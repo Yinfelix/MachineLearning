@@ -16,8 +16,8 @@ python scripts/08_posthoc.py
 再生成文档：
 
 ```bash
-python report/build_report.py   # -> ../实验2报告_钓鱼网站检测.docx
-python report/build_ppt.py      # -> ../实验2汇报_钓鱼网站检测.pptx
+python report/build_report.py   # -> ../实验2报告_钓鱼网站检测_参考版.docx
+python report/build_ppt.py      # -> ../实验2汇报_钓鱼网站检测_参考版.pptx
 ```
 
 说明：
