@@ -53,8 +53,8 @@ phiusiil-phishing/
 │   └── models/                     # 调参后的最佳模型（joblib）
 ├── tests/                          # pytest：划分、预处理、指标、方案定义
 ├── report/                         # 报告与 PPT 生成脚本
-├── 实验2报告_钓鱼网站检测.docx
-└── 实验2汇报_钓鱼网站检测.pptx
+├── 实验2报告_钓鱼网站检测_参考版.docx
+└── 实验2汇报_钓鱼网站检测_参考版.pptx
 ```
 
 ## 环境与运行
@@ -108,7 +108,7 @@ python -m pytest -q
 - `outputs/metrics/tuning_summary.json`：各模型最佳超参数
 - `outputs/metrics/robustness_*.csv`、`feature_selection_k.csv`、`permutation_importance.csv` 等
 - `outputs/figures/fig01…fig22`：报告与 PPT 使用的全部图
-- `实验2报告_钓鱼网站检测.docx`、`实验2汇报_钓鱼网站检测.pptx`
+- `实验2报告_钓鱼网站检测_参考版.docx`、`实验2汇报_钓鱼网站检测_参考版.pptx`
 
 ## 复现说明
 

@@ -24,8 +24,8 @@ def main():
         "outputs/figures/fig09_dt_pruning.png",
         "outputs/figures/fig16_permutation_importance.png",
         "outputs/figures/fig17_shap.png",
-        "实验2报告_钓鱼网站检测.docx",
-        "实验2汇报_钓鱼网站检测.pptx",
+        "实验2报告_钓鱼网站检测_参考版.docx",
+        "实验2汇报_钓鱼网站检测_参考版.pptx",
     ]
     missing = [p for p in required if not (C.ROOT / p).exists()]
     if missing:

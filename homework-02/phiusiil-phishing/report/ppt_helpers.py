@@ -117,8 +117,7 @@ def title(slide, kicker, headline, page=None, total=None):
     rect(slide, 0, 0, 13.333, 0.08, fill=BLUE)
     textbox(slide, kicker, 0.7, 0.42, 6.0, 0.35, size=11, bold=True, color=BLUE)
     textbox(slide, headline, 0.7, 0.78, 11.9, 0.75, size=27, bold=True, color=INK)
-    if page is not None:
-        footer(slide, page, total)
+
 
 
 def footer(slide, page, total=None):
