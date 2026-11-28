@@ -53,11 +53,13 @@ phiusiil-phishing/
 │   └── models/                     # 调参后的最佳模型（joblib）
 ├── tests/                          # pytest：划分、预处理、指标、方案定义
 ├── report/                         # 报告与 PPT 生成脚本
-├── 实验2报告_钓鱼网站检测_参考版.docx
+├── 实验2报告_钓鱼网站检测.docx
 └── 实验2汇报_钓鱼网站检测_参考版.pptx
 ```
 
 ## 环境与运行
+
+使用 Python 3.13.9 复现实验。Python 解释器需先安装，下面的命令安装项目依赖。
 
 ```bash
 python -m pip install -r requirements.txt
@@ -74,6 +76,8 @@ python scripts/05_robustness.py    # 约 5–10 分钟
 python scripts/06_feature_engineering.py  # 约 10–15 分钟
 python scripts/07_report_assets.py
 python scripts/08_posthoc.py
+python scripts/08b_training_controls.py
+python report/build_report.py
 python scripts/09_verify.py
 ```
 
@@ -90,9 +94,9 @@ python -m pytest -q
 - **防泄漏划分**：用 `StratifiedGroupKFold(5)` 先按 Domain 分组切出 20% 独立测试集，同一域名不会同时出现在训练与测试；训练集内部再用 `StratifiedGroupKFold(5)` 做交叉验证。缩放、频次编码、特征选择、PCA 全部在训练折内拟合。
 - **八套特征方案**：
   - A 全特征（51 列）
-  - B 去官方衍生捷径（45 列：去掉 `URLSimilarityIndex` 等 6 个特征）
-  - C 仅 URL（23 列）
-  - D 仅页面内容（28 列）
+  - B 从 A 去除预选的衍生或匹配分数（45 列，去掉 `URLSimilarityIndex` 等 6 项）
+  - C URL 相关特征（23 列，含预计算分数和 TLD）
+  - D 页面与标题匹配（28 列，含 2 项地址与页面标题的匹配分数）
   - S 严格去捷径（39 列：在 B 上再去掉 6 个页面规模特征）
   - U 仅 URL 基础词法（19 列：在 C 上去掉 4 个 URL 捷径特征）
   - T 去除全部单向捷径（38 列：在 S 上再去掉 `IsHTTPS`）
@@ -108,7 +112,7 @@ python -m pytest -q
 - `outputs/metrics/tuning_summary.json`：各模型最佳超参数
 - `outputs/metrics/robustness_*.csv`、`feature_selection_k.csv`、`permutation_importance.csv` 等
 - `outputs/figures/fig01…fig22`：报告与 PPT 使用的全部图
-- `实验2报告_钓鱼网站检测_参考版.docx`、`实验2汇报_钓鱼网站检测_参考版.pptx`
+- `实验2报告_钓鱼网站检测.docx`、`实验2汇报_钓鱼网站检测_参考版.pptx`
 
 ## 复现说明
 

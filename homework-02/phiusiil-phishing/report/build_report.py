@@ -12,7 +12,7 @@ import numpy as np
 import pandas as pd
 from docx import Document
 from docx.enum.text import WD_ALIGN_PARAGRAPH
-from docx.shared import Inches, Pt
+from docx.shared import Inches, Pt, RGBColor
 
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parent
@@ -25,7 +25,8 @@ from docx_helpers import (  # noqa: E402
     setup_document, add_page_number_footer,
 )
 from load_metrics import FIG, load_all  # noqa: E402
-from team import TEAM, TEAM_NOTE  # noqa: E402
+from src.config import SHORTCUT_FEATURES  # noqa: E402
+from team import TEAM  # noqa: E402
 
 MODEL_CN = {
     "Logistic Regression": "逻辑回归",
@@ -64,16 +65,20 @@ def row(res, model, scheme):
 def build_header(doc):
     add_paragraph(doc, "机器学习课程设计　实验二", size=11, align=WD_ALIGN_PARAGRAPH.CENTER,
                   first_indent=False, line=1.0, before=6, after=2)
-    p = doc.add_paragraph()
+    title_style = doc.styles["Title"]
+    for border in title_style.element.xpath("./w:pPr/w:pBdr"):
+        border.getparent().remove(border)
+    title_style.font.color.rgb = RGBColor(0, 0, 0)
+    p = doc.add_paragraph(style="Title")
     p.alignment = WD_ALIGN_PARAGRAPH.CENTER
     p.paragraph_format.space_before = Pt(2)
     p.paragraph_format.space_after = Pt(8)
     p.paragraph_format.line_spacing = 1.0
-    r = p.add_run("PhiUSIIL 钓鱼网站检测：捷径特征、模型比较与鲁棒性分析")
+    r = p.add_run("PhiUSIIL 钓鱼网站检测实验报告")
     set_run_font(r, 18, bold=True)
 
     add_caption(doc, "表 1　小组分工与贡献")
-    rows = [[m["name_id"], f"{m['member']}：{m['tasks']}（{m['share']}）"] for m in TEAM]
+    rows = [["", f"{m['member']}　{m['tasks']}"] for m in TEAM]
     add_table(doc, ["姓名 / 学号", "具体任务及贡献"], rows, widths_in=[1.45, 4.3],
               font_size=8.8, header_fill="EDF2F9")
 
@@ -96,9 +101,8 @@ def build_section1(doc, R):
     add_paragraph(doc, '两条简单规则在留出的 46,994 条记录中只漏掉 5 个钓鱼网址。我们据此追问：如果删去相似度分数，模型还能利用哪些信息识别钓鱼样本？')
 
     add_h2(doc, "1.2　课题目标")
-    add_paragraph(doc, '我们围绕三个问题组织实验。')
-    add_paragraph(doc, '1. 单个特征能区分多少样本？模型移除这一列后损失多少性能？')
-    add_paragraph(doc, "2. 五类算法在同一套严格划分下的表现有何差异，差异能否用算法原理和数据特点解释？", first_indent=False)
+    add_paragraph(doc, "1. 相似度单独用于分类时表现如何？移除该列后，逻辑回归的 F1 变化多大？", first_indent=False)
+    add_paragraph(doc, "2. 五类算法在不同特征组上的漏报与误报有何差异？", first_indent=False)
     add_paragraph(doc, "3. 当训练样本减少、标签被污染、特征被加噪或遇到罕见 TLD 时，模型是否仍然可靠？", first_indent=False)
 
     add_h2(doc, "1.3　课题数据集")
@@ -109,7 +113,6 @@ def build_section1(doc, R):
         f"但 Domain 有 {a['unique_domains']:,} 个，其中 {a['rows_in_repeated_domains']:,} 行落在重复域名中，最大单域名包含 {a['max_domain_group']:,} 条样本。"
         "这说明如果随机划分，同一域名的样本可能同时出现在训练和测试中，评估可能高估对新域名的识别效果。"
     ))
-    add_paragraph(doc, '全量数据含 134,850 条合法记录和 100,945 条钓鱼记录。原始标签 0 表示钓鱼；建模时将钓鱼记为正类 1。')
     add_caption(doc, "表 2　数据集概况与最终划分")
     tr, te = a["train_test"]["train"], a["train_test"]["test"]
     rows = [
@@ -119,7 +122,7 @@ def build_section1(doc, R):
         ["缺失值 / 完全重复行", f"{a['missing_total']} / {a['duplicate_rows']}"],
         ["Domain 数 / 重复域名行数", f"{a['unique_domains']:,} / {a['rows_in_repeated_domains']:,}"],
         ["训练集", f"{tr['n']:,}（钓鱼 {tr['phishing']:,}，{pct(tr['phishing_rate'])}）"],
-        ["独立测试集", f"{te['n']:,}（钓鱼 {te['phishing']:,}，{pct(te['phishing_rate'])}）"],
+        ["外层留出集", f"{te['n']:,}（钓鱼 {te['phishing']:,}，{pct(te['phishing_rate'])}）"],
         ["训练/测试 Domain 重叠", f"{a['train_test']['group_overlap']} 个"],
     ]
     add_table(doc, ["项目", "数值"], rows, widths_in=[2.25, 3.5], font_size=9)
@@ -133,48 +136,49 @@ def build_section2(doc, R):
 
     add_h2(doc, "2.1　数据审计与分布")
     add_figure(doc, FIG / "fig01_dataset_overview.png", width_in=4.4,
-               caption="图 1　训练集类别分布、URLSimilarityIndex 分布、域名重复情况与常见 TLD")
+               caption="图 1　(a)–(c) 训练集的类别、相似度与域名样本数分布，(d) 全量数据中最常见的 12 个 TLD")
 
     add_paragraph(doc, '训练集有 107,915 条合法记录和 80,886 条钓鱼记录，其中 44 个域名同时出现两类标签。划分时，同一 Domain 的全部记录放在同一侧。')
-    add_h2(doc, "2.2　捷径特征的发现：这个数据集有多容易？")
+    add_h2(doc, "2.2　相似度与 HTTPS 的规则基线")
     add_paragraph(doc, '在 80,886 条钓鱼训练记录中，636 条的 URLSimilarityIndex 等于 100。合法训练记录的这一列均为 100。以相似度由低到高排列，单列识别钓鱼样本的 ROC-AUC 为 0.9961。')
     add_paragraph(doc, (
-        f"第二个单向捷径是 IsHTTPS：全部合法样本都使用 HTTPS，而钓鱼样本中只有 {pct(a['is_https_by_label']['0'])} 使用 HTTPS。"
-        "按方向校正后的单变量 AUC 显示：除了 URLSimilarityIndex，"
-        "LineOfCode、NoOfExternalRef、NoOfImage、NoOfSelfRef、NoOfJS、NoOfCSS 等页面规模特征的 AUC 也在 0.96–0.99 之间。"
-        "它们不是官方标注的“衍生特征”，但同样把两类样本推得很开。"
+        f"训练集中的合法样本均使用 HTTPS，钓鱼样本中有 {pct(a['is_https_by_label']['0'])} 使用 HTTPS。"
+        "代码行数和外部引用数也有很强的单变量区分度，方向校正后的 ROC-AUC 分别为 0.9907 和 0.9880。"
     ))
     s = R["shortcut"]
     add_paragraph(doc, '将相似度小于 100 或 IsHTTPS 等于 0 的网址判为钓鱼，在留出集中得到 0 次误报和 5 次漏报，F1 为 0.99988。这说明数据中存在很强的判别信号。判断是否存在标签泄漏，还需要核实相似度的计算过程和参考库来源。')
-    add_caption(doc, "表 3　两个单向捷径特征的统计")
+    add_caption(doc, "表 3　训练集中的单特征统计及留出集上的规则结果")
     rows = [
-        ["URLSimilarityIndex", "合法恒为 100；钓鱼训练均值 49.53，0.79% 等于 100", "0.9961", "小于 100 判钓鱼"],
-        ["IsHTTPS", "合法 100% 为 1；钓鱼训练样本中 49.15% 为 1", "0.7542", "等于 0 判钓鱼"],
+        ["URLSimilarityIndex", "合法样本均为 100，钓鱼样本有 0.79% 为 100", "0.9961", "小于 100 判钓鱼"],
+        ["IsHTTPS", "合法样本均为 1，钓鱼样本有 49.15% 为 1", "0.7542", "等于 0 判钓鱼"],
         ["两条规则合并", "测试集仅漏报 5 条，误报 0 条", "—", "F1 0.99988"],
     ]
-    add_table(doc, ["特征 / 规则", "取值特点", "方向校正 AUC", "使用方式"], rows,
+    add_table(doc, ["特征 / 规则", "取值或错误数", "ROC-AUC¹", "规则或 F1"], rows,
               widths_in=[1.3, 2.4, 0.95, 1.1], font_size=8.8)
+    add_paragraph(doc, "¹ 单特征 ROC-AUC 按分数方向校正，两条规则的 F1 在外层留出集计算。",
+                  size=9, first_indent=False, line=1.1)
 
     add_h2(doc, "2.3　预处理")
     add_paragraph(doc, '主实验保留长度、数量和比例列的原始尺度。数值缺失用训练折中位数填补，TLD 按训练折出现次数编码，未见类别记为 0。逻辑回归与 SVM 另做标准化，树模型和 GaussianNB 使用未缩放输入。')
-    add_paragraph(doc, '原始 URL、Domain、Title 与文件名不直接入模；Domain 用于分组。')
+    add_paragraph(doc, "原始 URL、Domain、Title 与文件名不直接入模。我们用 Domain 划分样本。")
 
-    add_h2(doc, "2.4　数据划分与防泄漏")
+    add_h2(doc, "2.4　按域名划分数据")
     add_paragraph(doc, '外层按 Domain 分组留出 46,994 条样本，训练和留出两侧的域名交集为零。其余 188,801 条样本按域名做五折交叉验证。后续树深度和贝叶斯阈值的事后诊断也查看过同一留出集，这部分结果作为探索性比较。')
     add_paragraph(doc, '主表中的 RBF SVM 使用训练集内固定的 20,000 条分层子样本，其余模型使用完整训练集。第 4.4 节另用同一子样本比较两种 SVM。')
 
     add_h2(doc, "2.5　八套特征方案")
-    add_paragraph(doc, '表 4 描述两条删列路径。A→B→S→T 依次去除衍生特征、六项页面规模特征和 HTTPS；C→U→V 从 URL 输入中去除四项衍生特征和 HTTPS。D 单独考察页面信息。')
+    add_paragraph(doc, "A→B→S→T 和 C→U→V 是两条逐步删列的路径。D 由 26 项页面字段与 2 项地址–标题匹配分数组成。C 不使用当前页面内容，保留数据集预计算的相似度和先验统计。")
+    add_paragraph(doc, "B 从 A 中删去我们预选的六项衍生或匹配分数：" + "、".join(SHORTCUT_FEATURES) + "。")
     add_caption(doc, "表 4　特征方案与特征数")
     rows = [
-        ["A 全特征", "51", "全部数值特征 + TLD", "基线，预计接近 100%"],
-        ["B 去官方捷径", "45", "A 去掉 6 个官方衍生特征", "检验官方衍生特征的贡献"],
-        ["C 仅 URL", "23", "22 个 URL 数值特征 + TLD", "只看网址能做到多好"],
-        ["D 仅页面", "28", "28 个页面内容特征", "只看页面能做到多好"],
-        ["S 严格去捷径", "39", "B 去掉 6 个页面规模特征", "去掉第二组捷径"],
-        ["T 去掉 HTTPS", "38", "S 再去掉 IsHTTPS", "最严格的全特征消融"],
-        ["U 仅 URL 基础词法", "19", "C 去掉 4 个 URL 衍生特征", "严格的 URL-only 对照"],
-        ["V 仅 URL 基础词法（去 HTTPS）", "18", "U 再去掉 IsHTTPS", "最严格的 URL-only 对照"],
+        ["A 全特征", "51", "全部数值特征和 TLD", "基线"],
+        ["B 去除预选分数", "45", "A 去掉 6 项衍生或匹配分数", "评估这组分数的贡献"],
+        ["C URL 相关特征", "23", "22 项 URL 数值特征和 TLD", "评估 URL 侧输入"],
+        ["D 页面与标题匹配", "28", "26 项页面特征和 2 项地址–标题匹配分数", "评估页面侧输入"],
+        ["S 去除页面规模字段", "39", "B 去掉 6 项页面规模特征", "评估页面规模的贡献"],
+        ["T 去掉 HTTPS", "38", "S 再去掉 IsHTTPS", "评估 HTTPS 的贡献"],
+        ["U URL 基础特征", "19", "C 去掉 4 项衍生分数", "保留 HTTPS 和 TLD"],
+        ["V URL 基础特征去掉 HTTPS", "18", "U 再去掉 IsHTTPS", "比较移除 HTTPS 前后"],
     ]
     add_table(doc, ["方案", "特征数", "构成", "用途"], rows, widths_in=[1.55, 0.6, 2.45, 1.15], font_size=8.5)
 
@@ -196,17 +200,13 @@ def build_section3(doc, R):
         "逻辑回归假设正类的对数几率是特征的线性组合，再用 Sigmoid 函数把线性输出映射到 (0,1)："
     ))
     add_equation(doc, mr("p(y=1 | x) = ") + mfrac(mr("1"), mr("1 + exp(−(") + msup(mr("w"), mr("T")) + mr("x + b))")))
-    add_paragraph(doc, (
-        "训练时最小化带正则化的交叉熵。L2 正则化把系数整体压小，L1 正则化可以把部分系数压到 0，起到特征选择的作用。"
-        "关键超参数是正则化强度的倒数 C：C 越小，正则化越强。我们选择逻辑回归，是因为它训练快、系数可解释，"
-        "并且能告诉我们“在这个特征空间里，类别是否已经接近线性可分”。"
-    ))
+    add_paragraph(doc, "主实验使用 L2 正则化，C 越小，正则化越强。第 6.2 节以逻辑回归为线性基线，比较加入二阶项后的验证表现，并另用 L1 观察非零系数的变化。")
 
     add_h2(doc, "3.2　高斯朴素贝叶斯")
     add_paragraph(doc, (
         "朴素贝叶斯用贝叶斯公式计算后验概率，并假设各特征在给定类别下条件独立 [7]。高斯版本进一步假设每个特征在每个类别下服从正态分布，"
-        "均值与方差从训练数据估计。关键超参数 var_smoothing 在方差上加一个很小的平滑项，避免某个特征方差为 0 时概率计算失败。"
-        "选择它，是为了检验“特征独立假设”在一组高度相关的特征上会被破坏到什么程度；它也是训练成本最低的生成式基线。"
+        "均值与方差从训练数据估计。var_smoothing 乘以训练特征中的最大方差，得到加到各特征方差上的平滑项 [5]。"
+        "第 4.4 节比较三种输入表示下的验证表现。"
     ))
 
     add_h2(doc, "3.3　决策树")
@@ -216,37 +216,31 @@ def build_section3(doc, R):
     ))
     add_equation(doc, mr("Gini(t) = 1 − ") + msub(mr("Σ"), mr("k")) + msup(msub(mr("p"), mr("tk")), mr("2")))
     add_paragraph(doc, (
-        "关键超参数是最大深度 max_depth 与叶节点最小样本数 min_samples_leaf。树越深、叶节点越小，模型越容易记住训练集中的个别样本，"
-        "产生过拟合。选择决策树，是因为它的规则直观、容易可视化，也方便展示剪枝前后训练/验证曲线的变化。"
+        "max_depth 限制最大深度，min_samples_leaf 规定叶节点的最小样本数。第 5.4 节比较不同树深和剪枝强度下的训练与验证 F1。"
     ))
 
     add_h2(doc, "3.4　随机森林")
     add_paragraph(doc, (
-        "随机森林由 Breiman 提出 [3]，训练多棵决策树，每棵树使用自助采样（Bootstrap）得到的训练子集，并在每次划分时只考虑随机抽取的一部分特征；"
-        "预测时对所有树的输出取平均（分类任务取多数投票）："
+        "随机森林使用自助采样训练多棵决策树，每次分裂只考虑随机抽取的部分特征 [3]。"
+        "在本项目所用的实现中，每棵树根据样本落入的叶节点估计类别概率。森林对各树的类别概率取平均，再选择平均概率最高的类别 [5]。"
     ))
     add_paragraph(doc, (
-        "这种“样本随机 + 特征随机”的双重扰动降低了树与树之间的相关性，从而降低方差。关键超参数包括树的数量 n_estimators、"
-        "最大深度 max_depth、每次划分考虑的特征比例 max_features 和叶节点最小样本数 min_samples_leaf。"
-        "随机森林通常是表格数据上最稳的强基线，因此我们把它作为重点优化对象。"
+        "网格搜索比较树的数量 n_estimators、最大深度 max_depth、分裂时考虑的特征规模 max_features 和叶节点最小样本数 min_samples_leaf。"
+        "我们在方案 B 上单独调参，第 5.5 节则使用森林给出的钓鱼类平均概率比较两个阈值。"
     ))
 
     add_h2(doc, "3.5　支持向量机")
     add_paragraph(doc, (
-        "支持向量机由 Cortes 与 Vapnik 提出 [4]，寻找一个使两类间隔最大的决策边界。对于线性不可分的数据，RBF 核把样本隐式映射到高维空间："
+        "支持向量机在增大分类间隔的同时惩罚间隔违例 [4]。我们使用径向基核（RBF）度量标准化特征向量 x 与 z 的相似度。"
     ))
+    add_equation(doc, mr("K(x, z) = ") + mr("exp", italic=False) + mr("(−γ") + msup(mr("‖x − z‖"), mr("2")) + mr(")"))
     add_paragraph(doc, (
-        "关键超参数是惩罚系数 C 与核宽度 γ。C 越大，模型越不允许训练样本越过间隔，容易过拟合；γ 越大，单个样本的影响范围越小，"
-        "决策边界越弯曲。选择 SVM，是为了与线性模型和树模型形成对照：它依赖距离与间隔，对特征尺度敏感，"
-        "理论上能学到非线性边界，但在二十多万样本上训练成本较高，因此只在 20,000 条分层子样本上训练。"
+        "C 越大，训练对间隔违例的惩罚越重。γ 越大，核相似度随距离衰减得越快。"
     ))
 
     add_h2(doc, "3.6　超参数搜索")
     add_paragraph(doc, (
-        "所有模型先在方案 A 上用完整网格和训练集内部的 5 折分组交叉验证选择超参数，评分指标为钓鱼类的 F1；"
-        "选定后固定用于 A–D、S–V 全部特征方案。这样做的目的，是让消融实验的差异只来自特征集合，"
-        "而不是每个方案各自调参带来的额外自由度。RBF SVM 在 20,000 条子样本上做同样的 5 折搜索；"
-        "LinearSVC 在全量训练集上搜索 C。表 5 汇总了搜索空间与最终选中的参数。"
+        "主实验在方案 A 上用五折分组交叉验证选参，以钓鱼类 F1 为目标。其余特征方案沿用表 5 中为各模型选出的参数。"
     ))
     add_caption(doc, "表 5　超参数搜索空间与最佳参数")
     t = R["tuning"]
@@ -284,66 +278,78 @@ def build_section4(doc, R):
     add_equation(doc, mr("F1 = ") + mfrac(mr("2PR"), mr("P + R")) + mr("，  FPR = ") + mfrac(mr("FP"), mr("FP + TN")))
     add_paragraph(doc, '精确率表示报警中钓鱼样本的比例，召回率表示实际钓鱼样本被识别的比例。调参以钓鱼类 F1 为准，另报合法网址误报率、ROC-AUC 和平均精确率 AP。下文分别标注交叉验证、固定验证折及外层留出的结果。')
 
-    add_h2(doc, "4.2　测试集结果：全特征方案没有区分度")
-    a = res[res.scheme == "A"]
-    a4 = a[a.model != "Gaussian NB"]
-    nb_a = a[a.model == "Gaussian NB"].iloc[0]
+    add_h2(doc, "4.2　全特征方案的留出表现")
     add_paragraph(doc, '表 6 列出五个主模型的留出集 F1。方案 A 的决策树无错分；逻辑回归有 1 次误报和 6 次漏报。即使两者四舍五入后都接近满分，错误数仍可直接比较。')
     add_caption(doc, "表 6　测试集 F1（正类 = 钓鱼）")
-    schemes = ["A", "B", "C", "D", "S", "T", "V"]
+    schemes = ["A", "B", "C", "D", "S", "T", "U", "V"]
     rows = []
-    for model in ["Logistic Regression", "Gaussian NB", "Decision Tree", "Random Forest", "SVM (RBF)"]:
+    for model in MAIN:
         vals = []
         for s in schemes:
             r = row(res, model, s)
             vals.append(f4(r["test_f1"]) if r is not None else "—")
         rows.append([MODEL_CN[model]] + vals)
-    add_table(doc, ["模型", "A", "B", "C", "D", "S", "T", "V"], rows,
-              widths_in=[1.0, 0.66, 0.66, 0.66, 0.66, 0.66, 0.66, 0.66], font_size=8.4)
-    add_h2(doc, "4.3　消融：捷径不止一层")
+    add_table(doc, ["模型", *schemes], rows,
+              widths_in=[1.15] + [0.57] * len(schemes), font_size=8.4)
+    add_h2(doc, "4.3　相似度与 HTTPS 的消融")
     add_paragraph(doc, '在训练内第 1 折，仅移除 URLSimilarityIndex，逻辑回归 F1 从 0.999938 降至 0.999659。相似度单独使用时区分度很高，同时模型还能利用其他字段补偿其缺失。图 2 分别展示保留页面和仅用 URL 的两条消融路径。')
     add_figure(doc, FIG / "fig04_ablation_lines.png", width_in=5.55,
                caption="图 2　两条消融路径上的测试集 F1：(a) A → B → S → T；(b) C → U → V")
-    add_paragraph(doc, 'S 和 T 中，高斯朴素贝叶斯的 F1 已降至约 0.493。进一步限制到 V 的 18 项 URL 特征后，各模型的误报和漏报也呈现不同分布。')
+    tree_u = row(res, "Decision Tree", "U")
+    tree_v = row(res, "Decision Tree", "V")
+    add_paragraph(doc, f"在 S 和 T 中，高斯朴素贝叶斯的 F1 约为 0.493。U 到 V 只删去 HTTPS，深度仍为 3 的决策树留出 F1 从 {tree_u['test_f1']:.6f} 降至 {tree_v['test_f1']:.6f}。")
 
-    add_h2(doc, "4.4　去掉捷径后，哪种模型更好？")
-    def best_on(scheme):
-        return res[res.scheme == scheme].sort_values("test_f1", ascending=False).iloc[0]
-
-    bB, bD, bT, bV = best_on("B"), best_on("D"), best_on("T"), best_on("V")
-    add_paragraph(doc, '在仅页面方案 D，随机森林在五个主模型中 F1 最高（0.9970）。在 V，逻辑回归为 0.996022，随机森林为 0.995108。另列的全量 LinearSVC 为 0.996071，与逻辑回归只差约 0.00005。')
-    add_paragraph(doc, '在 V 上，高斯朴素贝叶斯默认阈值的召回率为 0.4191。我们在训练集内比较三种输入表示，各自在其余四折选择平滑参数。第 1 折用 TLD 原始计数时 F1 为 0.6189，改用相对频率后为 0.6815，Brier 分数也从 0.2315 降至 0.2060。输入尺度影响了本次结果。')
-    ph = R["posthoc"]
+    add_h2(doc, "4.4　模型差异与训练内对照")
+    add_paragraph(doc, "用页面与标题匹配特征（D）时，随机森林在五个主模型中 F1 最高（0.9970）。在 V，逻辑回归为 0.996022，随机森林为 0.995108。全量 LinearSVC 对照为 0.996071，与逻辑回归相差约 0.00005。")
+    controls = R["training_controls"]
+    nb = controls[controls["model"] == "Gaussian NB"].set_index("condition")
+    add_paragraph(doc, "在 V 的外层留出集中，高斯朴素贝叶斯使用默认阈值时的召回率为 0.4191。我们另在训练集内比较三种输入表示，用折 0、2、3、4 分别搜索平滑参数，在折 1 评估。Brier 分数越低，预测概率与真实标签的平均平方误差越小。")
+    nb_rows = [
+        [label, f"{nb.loc[key, 'var_smoothing']:.0e}", f4(nb.loc[key, "f1"]), f4(nb.loc[key, "brier"])]
+        for key, label in [
+            ("counts", "TLD 原始计数"),
+            ("relative frequency", "TLD 相对频率"),
+            ("standardized", "全部特征标准化"),
+        ]
+    ]
+    add_table(doc, ["输入表示", "选出的平滑参数", "验证 F1", "Brier 分数"], nb_rows,
+              widths_in=[2.0, 1.4, 1.1, 1.2], font_size=8.8, caption="表 7　高斯朴素贝叶斯在方案 V 的折 1 对照")
+    add_paragraph(doc, "相对频率配置在折 1 的 F1 最高、Brier 分数最低。各配置分别选择平滑强度，因此这组结果比较的是输入表示与平滑参数的组合。")
     add_paragraph(doc, '决策树沿用 A 上选出的深度 3 时，V 的留出 F1 为 0.7835。用训练内验证重新为 V 选择深度后，不限深度的树在原留出集上达到 0.9939。前一个数字衡量的是固定参数迁移的表现。')
-    add_paragraph(doc, '为对照训练规模，我们还在同一 20,000 条子样本内，用完全相同的 16,053 条训练记录和 3,947 条验证记录比较两种 SVM。V 上 RBF 与线性核对应的验证 F1 分别为 0.9922 和 0.9913。')
+    matched = controls[controls["condition"] == "matched 20k subset"].set_index("model")
+    rbf = matched.loc["SVM (RBF)"]
+    linear = matched.loc["Linear SVM"]
+    add_paragraph(doc, f"我们用同一子样本中的 {int(rbf['n_train']):,} 条记录训练 RBF SVC 和 LinearSVC，并在共同的 {int(rbf['n_val']):,} 条验证记录上比较。两者分别沿用 A 上选出的参数，在 V 的验证 F1 为 {f4(rbf['f1'])} 和 {f4(linear['f1'])}。")
 
 
 def build_section5(doc, R):
     res = R["res"][R["res"]["model"].isin(MAIN)]
     add_h1(doc, "五、结果可视化与模型优化")
 
-    add_h2(doc, "5.1　混淆矩阵与预测概率")
+    add_h2(doc, "5.1　方案 V 的误报与漏报")
     lr_v = row(res, "Logistic Regression", "V")
     dt_v = row(res, "Decision Tree", "V")
     add_paragraph(doc, (
         "图 3 对比了逻辑回归与决策树在 V 方案上的混淆矩阵（括号内为按真实类别归一化的比例）。"
-        f"逻辑回归只误报 {int(lr_v['test_fp'])} 条、漏报 {int(lr_v['test_fn'])} 条，钓鱼类召回率 {pct(lr_v['test_recall'])}；"
-        f"决策树误报 {int(dt_v['test_fp'])} 条、漏报 {int(dt_v['test_fn'])} 条，召回率只有 {pct(dt_v['test_recall'])}。"
-        "两者面对的是同一组 URL 基础词法特征，差别来自模型容量与边界形状：线性模型可以把多个连续特征平滑地组合，"
-        "而深度 3 的树只能做很少几次硬切分。"
+        f"逻辑回归误报 {int(lr_v['test_fp']):,} 条、漏报 {int(lr_v['test_fn']):,} 条，钓鱼类召回率为 {pct(lr_v['test_recall'])}。"
+        f"沿用深度 3 的决策树误报 {int(dt_v['test_fp']):,} 条、漏报 {int(dt_v['test_fn']):,} 条，召回率为 {pct(dt_v['test_recall'])}。"
     ))
     add_figure(doc, FIG / "fig20_confusion.png", width_in=5.55,
                caption="图 3　方案 V 上逻辑回归与决策树的混淆矩阵")
-    add_h2(doc, "5.2　ROC 与 PR 曲线")
-    auc_rank = res[res.scheme == "V"].sort_values("test_roc_auc", ascending=False)
-    add_paragraph(doc, 'ROC-AUC 衡量模型将钓鱼网址排在合法网址前面的能力。V 上浅树 F1 为 0.7835，GaussianNB 为 0.5870；阈值下的 F1 还取决于最终将多少样本判为钓鱼。逐模型 ROC-AUC 与 AP 见 results_all.csv。')
+    add_h2(doc, "5.2　排序指标与阈值指标")
+    nb_v = row(res, "Gaussian NB", "V")
+    add_paragraph(doc, (
+        "ROC-AUC 衡量钓鱼样本的分数排在合法样本之前的能力，AP 汇总随阈值变化的精确率与召回率。"
+        f"在 V 的留出集上，高斯朴素贝叶斯的 ROC-AUC 为 {f4(nb_v['test_roc_auc'])}，AP 为 {f4(nb_v['test_pr_auc'])}。"
+        f"使用默认阈值时，F1 为 {f4(nb_v['test_f1'])}，共漏报 {int(nb_v['test_fn']):,} 条。"
+    ))
 
-    add_h2(doc, "5.3　随机森林调参：收益有多大？")
+    add_h2(doc, "5.3　随机森林调参前后的错误数")
     add_paragraph(doc, (
         "我们比较了三种随机森林配置：默认参数（100 棵树，其余取默认值）、在方案 A 上调参得到的最佳参数、以及专门在方案 B 上重新网格搜索得到的最佳参数。"
-        "三者都在方案 B 上做 5 折交叉验证并评估测试集，结果见表 7。"
+        "三者都在方案 B 上做五折交叉验证，并在同一外层留出集评估。"
     ))
-    add_caption(doc, "表 7　随机森林调参前后的性能（方案 B）")
+    add_caption(doc, "表 8　随机森林调参前后的性能（方案 B）")
     opt = R["rfopt"]
     rows = []
     for _, r in opt.iterrows():
@@ -356,7 +362,7 @@ def build_section5(doc, R):
     delta = d2["test_f1"] - d0["test_f1"]
     add_paragraph(doc, '在 B 上，默认森林误报 1 次、漏报 5 次；重新调参后误报 2 次、漏报仍为 5 次。增加搜索成本没有减少这批留出样本上的错误。')
 
-    add_h2(doc, "5.4　决策树剪枝：从记住样本到学习规律")
+    add_h2(doc, "5.4　树深与剪枝强度")
     dd = R["dt_depth"]
     best_depth = dd.loc[dd["val_f1"].idxmax()]
     best_depth_label = int(best_depth["max_depth"]) if best_depth["max_depth"] < 99 else "不限制"
@@ -375,7 +381,7 @@ def build_section5(doc, R):
     add_h2(doc, "5.5　阈值优化：召回率与误报的权衡")
     th = R["threshold"]
     add_paragraph(doc, '对方案 V 的随机森林，用训练集五折的折外预测（OOF）选择阈值。每条概率由训练时未见该行的模型给出。我们选择满足折外召回率至少 99% 的最高候选阈值，再到留出集对照默认阈值 0.5。SVM 的类别预测使用其决策函数。')
-    add_caption(doc, "表 8　随机森林（方案 V）在默认阈值与优化阈值下的测试集表现（阈值在 OOF 上选择）")
+    add_caption(doc, "表 9　随机森林（方案 V）在默认阈值与优化阈值下的留出表现")
     d05, dch = th["default_0.5"], th["chosen"]
     rows = [
         ["0.500（默认）", f4(d05["recall"]), f4(d05["precision"]), f4(d05["f1"]), pct(d05["fpr"], 3), f"{d05['fp']} / {d05['fn']}"],
@@ -392,7 +398,7 @@ def build_section6(doc, R):
     add_h2(doc, "6.1　泛化与鲁棒性")
     add_paragraph(doc, '鲁棒性实验使用方案 V 和训练内的域名分组。决策树用折 2–4 训练、折 0 选深度；折 1 的 37,796 条记录用于学习曲线、扰动和 TLD 对照。')
 
-    add_h3(doc, "（1）训练样本量：谁最“省样本”？")
+    add_h3(doc, "（1）训练样本量与验证 F1")
     lc = R["lc"]
     add_paragraph(doc, '从其余四折按类别比例抽取 1%、5%、10%、25% 和 50% 的记录，每个比例使用三个种子。100% 直接使用完整训练池，只训练一次。')
     add_figure(doc, FIG / "fig11_learning_curve.png", width_in=5.0,
@@ -435,11 +441,6 @@ def build_section6(doc, R):
     add_paragraph(doc, '在训练池内比较训练与验证 F1，决策树的差距约 0.0054，随机森林约 0.0035。这个差距衡量同一数据来源内的表现，跨来源效果仍待检验。')
 
     add_h2(doc, "6.2　特征工程与可解释性")
-    add_paragraph(doc, (
-        "这一节回答“模型到底在看什么，多余特征能不能去掉”。所有特征选择与降维都放在 Pipeline 内，只在训练折上拟合，"
-        "避免用验证集或测试集挑选特征。"
-    ))
-
     add_h3(doc, "（1）相关性与单变量筛选")
     cs = R["corr_summary"]
     hc = R["high_corr"]
@@ -448,7 +449,7 @@ def build_section6(doc, R):
         f"|Spearman ρ| ≥ 0.95，{cs.get('n_pairs_abs_rho_ge_090', 0)} 对 ≥ 0.90。"
         "最极端的是 HasObfuscation、NoOfObfuscatedChar、ObfuscationRatio 三个变量，两两相关系数等于 1.0；"
         "NoOfDegitsInURL 与 DegitRatioInURL 的相关系数为 0.997；URLLength 与 NoOfLettersInURL 为 0.972。"
-        "这些高度相关的特征会放大朴素贝叶斯的“重复证据”问题，也让线性模型的系数难以单独解释。"
+        "这些是训练集上的整体相关性。高斯朴素贝叶斯的独立性假设针对给定类别后的特征分布。"
     ))
     add_paragraph(doc, '单变量 AUC 按能区分两类的方向校正后排序；互信息另在方案 B 的数值列上计算，两份名单的候选列不同。')
 
@@ -462,9 +463,9 @@ def build_section6(doc, R):
     bestk = kdf.sort_values("cv_f1_mean", ascending=False).iloc[0]
     add_paragraph(doc, '方案 B 下，随机森林保留 20 列时五折 F1 为 0.999350，使用全部 45 列时为 0.999858。另一组 PCA 对照中，逻辑回归保留 95% 方差需要 34 个主成分，F1 为 0.999708。')
     l1 = R["l1"]
-    add_paragraph(doc, '在测过的 C=0.001 至 1 范围内，L1 逻辑回归的非零系数从 13 个增至 45 个。该表给出训练样本上的系数路径。')
+    add_paragraph(doc, "C 从 0.001 增至 1 时，L1 逻辑回归的非零系数从 13 个增至 45 个。训练样本上的完整系数路径见 l1_path.csv。")
 
-    add_h3(doc, "（3）特征升维：线性模型能否追上非线性模型？")
+    add_h3(doc, "（3）同折十项特征的一阶与二阶对照")
     poly = R["poly"]
     add_paragraph(doc, '每个训练折用随机森林在数值列中选出前 10 项。线性和二阶逻辑回归共用该折选出的列，并在相同验证行上比较。')
     lin = poly[poly["mode"] == "linear"].iloc[0]
@@ -502,7 +503,7 @@ def build_section7(doc, R):
     add_h2(doc, "参考资料")
     refs = [
         "[1] UCI Machine Learning Repository. PhiUSIIL Phishing URL Dataset (ID 967). https://archive.ics.uci.edu/dataset/967/phiusiil+phishing+url+dataset",
-        "[2] Prasad, A., & Chandra, S. (2024). PhiUSIIL: A diverse security profile empowered phishing URL detection framework based on similarity index and lexical features. Computers & Security, 136, 103545. DOI: 10.1016/j.cose.2023.103545",
+        "[2] Prasad, A., & Chandra, S. (2024). PhiUSIIL: A diverse security profile empowered phishing URL detection framework based on similarity index and incremental learning. Computers & Security, 136, 103545. DOI: 10.1016/j.cose.2023.103545",
         "[3] Breiman, L. (2001). Random Forests. Machine Learning, 45(1), 5–32.",
         "[4] Cortes, C., & Vapnik, V. (1995). Support-vector networks. Machine Learning, 20(3), 273–297.",
         "[5] scikit-learn developers. Supervised Learning — User Guide. https://scikit-learn.org/stable/supervised_learning.html",
@@ -517,10 +518,13 @@ def build_appendix(doc, R):
     add_h1(doc, "附录")
     add_h2(doc, "运行环境与复现")
     add_paragraph(doc, (
-        "Python 3.13.9；numpy 2.3.5；pandas 2.3.3；scipy 1.16.3；scikit-learn 1.7.2；"
-        "matplotlib 3.10.6；seaborn 0.13.2；shap 0.54.1；python-docx 1.2.0；python-pptx 1.0.2。"
-        "划分种子为 42，学习曲线子样本种子为 42、52、62。完整运行顺序与依赖见项目 README.md；"
-        "实验记录汇总在 outputs/metrics/results_all.csv，图表在 outputs/figures/。"
+        "实验使用 Python 3.13.9 和 scikit-learn 1.7.2，完整依赖版本见 requirements.txt。"
+        "从项目 README.md 按顺序解压数据、安装依赖并运行实验。划分种子为 42，学习曲线的子样本种子为 42、52、62。"
+    ))
+    add_paragraph(doc, (
+        "outputs/metrics/results_all.csv 记录主实验的交叉验证与留出指标。"
+        "同目录的 training_controls.csv 记录单列消融、贝叶斯输入表示和同样本 SVM 等训练内对照。"
+        "各折的一阶与二阶对照见 polynomial_folds.csv，图表见 outputs/figures/。"
     ))
 
 
@@ -543,7 +547,7 @@ def main():
     build_section7(doc, R)
     build_appendix(doc, R)
 
-    out = ROOT / "实验2报告_钓鱼网站检测_参考版.docx"
+    out = ROOT / "实验2报告_钓鱼网站检测.docx"
     doc.save(out)
     print(f"report saved: {out}")
 
