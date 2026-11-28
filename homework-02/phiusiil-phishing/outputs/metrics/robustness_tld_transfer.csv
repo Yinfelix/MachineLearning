@@ -1,5 +1,5 @@
-model,split,n,phishing_rate,f1,roc_auc,fpr,recall
-Logistic Regression,随机划分,24508,0.398360,0.996660,0.998647,0.000000,0.993342
-Logistic Regression,罕见 TLD,8774,0.555163,0.991633,0.998497,0.002562,0.985424
-Random Forest,随机划分,24508,0.398360,0.995950,0.999015,0.001967,0.994879
-Random Forest,罕见 TLD,8774,0.555163,0.986134,0.997396,0.007174,0.978239
+model,split,validation_fold,grouping,tld_group,n,phishing_rate,f1,roc_auc,fpr,recall
+Logistic Regression,随机划分,1,Domain,common,30473,0.393562,0.995814,0.998152,0.000108,0.991829
+Logistic Regression,罕见 TLD,1,Domain,rare,7323,0.563157,0.996360,0.998307,0.003751,0.995635
+Random Forest,随机划分,1,Domain,common,30473,0.393562,0.995698,0.998351,0.001677,0.993996
+Random Forest,罕见 TLD,1,Domain,rare,7323,0.563157,0.988416,0.997279,0.007502,0.982784

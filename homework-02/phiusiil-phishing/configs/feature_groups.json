@@ -382,19 +382,7 @@
       ]
     }
   },
-  "log_features": [
-    "URLLength",
-    "DomainLength",
-    "NoOfSubDomain",
-    "LineOfCode",
-    "LargestLineLength",
-    "NoOfImage",
-    "NoOfCSS",
-    "NoOfJS",
-    "NoOfSelfRef",
-    "NoOfEmptyRef",
-    "NoOfExternalRef"
-  ],
+  "log_features": [],
   "n_features": {
     "A": 51,
     "B": 45,

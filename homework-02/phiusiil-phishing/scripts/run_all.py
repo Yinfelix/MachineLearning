@@ -15,6 +15,7 @@ SCRIPTS = [
     "scripts/06_feature_engineering.py",
     "scripts/07_report_assets.py",
     "scripts/08_posthoc.py",
+    "scripts/08b_training_controls.py",
     "report/build_report.py",
     "report/build_ppt.py",
     "scripts/09_verify.py",

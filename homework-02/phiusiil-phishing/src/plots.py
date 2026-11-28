@@ -479,7 +479,7 @@ def plot_learning_curve(df: pd.DataFrame, path_name):
     ax.set_xticklabels(["1%", "5%", "10%", "25%", "50%", "100%"])
     ax.set_xlabel("训练集使用比例（对数轴）")
     ax.set_ylabel("验证集 F1")
-    ax.set_title("学习曲线（方案 V，3 个随机种子）")
+    ax.set_title("学习曲线（方案 V，子样本重复 3 次，全量训练 1 次）")
     ax.legend()
     _style_axes(ax)
     fig.tight_layout()
@@ -490,7 +490,7 @@ def plot_noise_panels(label_df: pd.DataFrame, feature_df: pd.DataFrame, path_nam
     fig, axes = plt.subplots(1, 2, figsize=(10.4, 3.9))
     for ax, df, xcol, title in [
         (axes[0], label_df, "noise_rate", "(a) 标签噪声"),
-        (axes[1], feature_df, "noise_sd", "(b) 测试特征高斯噪声"),
+        (axes[1], feature_df, "noise_sd", "(b) 验证特征高斯扰动（数值压力测试）"),
     ]:
         for model in df["model"].unique():
             d = df[df["model"] == model]
@@ -532,7 +532,7 @@ def plot_tld_transfer(df: pd.DataFrame, path_name):
         w = 0.36
         a = df[df["split"] == "随机划分"].set_index("model").reindex(models_)[metric]
         b = df[df["split"] == "罕见 TLD"].set_index("model").reindex(models_)[metric]
-        ax.bar(x - w / 2, a.values, width=w, color=C.PALETTE["blue"], label="同分布随机划分")
+        ax.bar(x - w / 2, a.values, width=w, color=C.PALETTE["blue"], label="常见 TLD（域名留折）")
         ax.bar(x + w / 2, b.values, width=w, color=C.PALETTE["orange"], label="罕见 TLD 迁移")
         for i, v in enumerate(a.values):
             ax.text(i - w / 2, v + 0.003, f"{v:.3f}", ha="center", fontsize=7.5, color=C.INK_2)

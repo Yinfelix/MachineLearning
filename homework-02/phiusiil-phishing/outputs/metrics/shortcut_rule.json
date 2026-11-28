@@ -12,8 +12,8 @@
     "fp": 0,
     "fn": 5,
     "tp": 20054,
-    "roc_auc": NaN,
-    "pr_auc": NaN
+    "roc_auc": null,
+    "pr_auc": null
   },
   "rule1_flag_rate": 0.42364982763757075,
   "rule2_flag_rate": 0.0030855002766310593,

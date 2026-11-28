@@ -129,14 +129,6 @@ def inner_cv_splits(train_idx: np.ndarray, fold_id: np.ndarray) -> list[tuple[np
 
 
 def scheme_frame(X: pd.DataFrame, scheme: str) -> pd.DataFrame:
-    """Select scheme columns and apply the parameter-free log1p transform.
-
-    log1p is a fixed, stateless transform on long-tailed count features; it is
-    applied before the split only because it learns nothing from the data.
-    """
+    """Select the original-scale inputs used by the fitted pipelines."""
     numeric, categorical = C.scheme_columns(scheme)
-    out = X[numeric + categorical].copy()
-    for col in C.LOG_FEATURES:
-        if col in out.columns:
-            out[col] = np.log1p(out[col])
-    return out
+    return X[numeric + categorical].copy()

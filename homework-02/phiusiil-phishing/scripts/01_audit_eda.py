@@ -35,11 +35,12 @@ def main() -> None:
     dom_counts = df["Domain"].value_counts()
     dup_dom_rows = int((dom_counts[df["Domain"]].values > 1).sum())
     same_label = (
-        df.groupby("Domain")["label"].nunique().value_counts().sort_index().to_dict()
+        train.groupby("Domain")["label"].nunique().value_counts().sort_index().to_dict()
     )
-    sim = df.groupby("label")["URLSimilarityIndex"]
+    sim = train.groupby("label")["URLSimilarityIndex"]
     audit = {
         "shape": list(df.shape),
+        "class_conditional_scope": "outer training rows only",
         "n_rows": int(len(df)),
         "n_columns": int(df.shape[1]),
         "n_features_excluding_text": len(C.all_feature_columns()),
@@ -65,11 +66,11 @@ def main() -> None:
             }
             for k, v in sim
         },
-        "phishing_with_similarity_100": int(((df["label"] == 0) & (df["URLSimilarityIndex"] == 100)).sum()),
+        "phishing_with_similarity_100": int(((train["label"] == 0) & (train["URLSimilarityIndex"] == 100)).sum()),
         "unique_tld": int(df["TLD"].nunique()),
         "top_tld": {str(k): int(v) for k, v in df["TLD"].value_counts().head(15).items()},
         "is_https_by_label": {
-            str(k): float(v) for k, v in df.groupby("label")["IsHTTPS"].mean().items()
+            str(k): float(v) for k, v in train.groupby("label")["IsHTTPS"].mean().items()
         },
         "dtypes": {str(k): int(v) for k, v in df.dtypes.value_counts().items()},
         "train_test": splits["meta"],
@@ -107,7 +108,7 @@ def main() -> None:
                 "direction": "higher=phishing" if auc >= 0.5 else "lower=phishing",
             }
         )
-    auc_df = pd.DataFrame(rows).sort_values("auc", ascending=False)
+    auc_df = pd.DataFrame(rows).sort_values("auc_oriented", ascending=False)
     auc_df.to_csv(C.METRIC_DIR / "univariate_auc.csv", index=False, float_format="%.6f")
 
     # ---------------------------------------------------------- correlations

@@ -3,6 +3,7 @@
     235795,
     56
   ],
+  "class_conditional_scope": "outer training rows only",
   "n_rows": 235795,
   "n_columns": 56,
   "n_features_excluding_text": 51,
@@ -15,8 +16,8 @@
   "rows_in_repeated_domains": 21235,
   "max_domain_group": 1197,
   "domain_label_nunique_counts": {
-    "1": 220032,
-    "2": 54
+    "1": 176022,
+    "2": 44
   },
   "label_counts": {
     "0": 100945,
@@ -29,11 +30,11 @@
   "phishing_rate": 0.42810492164804176,
   "url_similarity_by_label": {
     "0": {
-      "mean": 49.61697250897354,
-      "std": 22.57208178127446,
+      "mean": 49.53243254588649,
+      "std": 22.643183960023677,
       "min": 0.155574352,
       "max": 100.0,
-      "pct_at_100": 0.007786418346624399
+      "pct_at_100": 0.007862918181143833
     },
     "1": {
       "mean": 100.0,
@@ -43,7 +44,7 @@
       "pct_at_100": 1.0
     }
   },
-  "phishing_with_similarity_100": 786,
+  "phishing_with_similarity_100": 636,
   "unique_tld": 695,
   "top_tld": {
     "com": 112554,
@@ -63,7 +64,7 @@
     "edu": 1861
   },
   "is_https_by_label": {
-    "0": 0.4922383476150379,
+    "0": 0.4915312909526989,
     "1": 1.0
   },
   "dtypes": {

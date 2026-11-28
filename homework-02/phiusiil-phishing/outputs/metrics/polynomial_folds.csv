@@ -1,0 +1,11 @@
+fold,mode,top10,f1,roc_auc
+0,linear,NoOfExternalRef|LineOfCode|NoOfImage|NoOfJS|NoOfSelfRef|HasSocialNet|NoOfCSS|NoOfOtherSpecialCharsInURL|HasCopyrightInfo|IsHTTPS,0.9963885312313538,0.9998745763586073
+0,quadratic,NoOfExternalRef|LineOfCode|NoOfImage|NoOfJS|NoOfSelfRef|HasSocialNet|NoOfCSS|NoOfOtherSpecialCharsInURL|HasCopyrightInfo|IsHTTPS,0.9967952746009803,0.9999178396875928
+1,linear,NoOfExternalRef|LineOfCode|NoOfImage|NoOfJS|NoOfSelfRef|HasSocialNet|NoOfCSS|NoOfOtherSpecialCharsInURL|HasCopyrightInfo|IsHTTPS,0.9962151765216852,0.9997994020860472
+1,quadratic,NoOfExternalRef|LineOfCode|NoOfImage|NoOfJS|NoOfSelfRef|HasSocialNet|NoOfCSS|NoOfOtherSpecialCharsInURL|HasCopyrightInfo|IsHTTPS,0.9972084367245657,0.9996770696710308
+2,linear,NoOfExternalRef|LineOfCode|NoOfImage|NoOfJS|NoOfSelfRef|HasSocialNet|NoOfCSS|NoOfOtherSpecialCharsInURL|HasCopyrightInfo|IsHTTPS,0.9971501146149557,0.999826388791551
+2,quadratic,NoOfExternalRef|LineOfCode|NoOfImage|NoOfJS|NoOfSelfRef|HasSocialNet|NoOfCSS|NoOfOtherSpecialCharsInURL|HasCopyrightInfo|IsHTTPS,0.9973658929622858,0.9996482002414462
+3,linear,NoOfExternalRef|LineOfCode|NoOfImage|NoOfJS|NoOfSelfRef|HasSocialNet|NoOfCSS|NoOfOtherSpecialCharsInURL|HasCopyrightInfo|IsHTTPS,0.9973209085614444,0.9998656021875811
+3,quadratic,NoOfExternalRef|LineOfCode|NoOfImage|NoOfJS|NoOfSelfRef|HasSocialNet|NoOfCSS|NoOfOtherSpecialCharsInURL|HasCopyrightInfo|IsHTTPS,0.9977560833454757,0.9998254198108113
+4,linear,NoOfExternalRef|LineOfCode|NoOfImage|NoOfJS|NoOfSelfRef|HasSocialNet|NoOfCSS|NoOfOtherSpecialCharsInURL|HasCopyrightInfo|HasDescription,0.9942999871909824,0.9997868652776665
+4,quadratic,NoOfExternalRef|LineOfCode|NoOfImage|NoOfJS|NoOfSelfRef|HasSocialNet|NoOfCSS|NoOfOtherSpecialCharsInURL|HasCopyrightInfo|HasDescription,0.9949668194787292,0.9994910797681562
