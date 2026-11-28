@@ -42,6 +42,7 @@ def load_all() -> dict:
         "threshold": _json("threshold_analysis.json"),
         "threshold_curve": _csv("threshold_curve.csv"),
         "posthoc": _json("posthoc_analysis.json"),
+        "training_controls": _csv("training_controls.csv"),
         "lc": _csv("robustness_learning_curve.csv"),
         "label_noise": _csv("robustness_label_noise.csv"),
         "feat_noise": _csv("robustness_feature_noise.csv"),
